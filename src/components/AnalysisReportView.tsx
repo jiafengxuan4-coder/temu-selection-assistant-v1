@@ -7,6 +7,7 @@ import type {
   HotProductFactorType,
   PriceComparisonRiskLevel
 } from "@/types/analysis";
+import type { ProductInput } from "@/types/product";
 import type { AnalysisReport } from "@/types/recommendation";
 
 type AnalysisReportViewProps = {
@@ -42,6 +43,12 @@ const riskLevelLabelMap: Record<PriceComparisonRiskLevel, string> = {
 
 function formatOptionalNumber(value: number | undefined): string {
   return typeof value === "number" ? String(value) : "未提供";
+}
+
+function formatProductPrice(product: ProductInput): string {
+  return product.priceDisplay && product.priceDisplay.trim().length > 0
+    ? product.priceDisplay
+    : String(product.price);
 }
 
 function getStatusLabel(value: boolean): string {
@@ -105,7 +112,7 @@ export function AnalysisReportView({
         <div className="mt-4 grid gap-3 text-sm leading-6 text-slate-700 sm:grid-cols-2">
           <p><strong className="text-slate-950">商品标题：</strong>{report.input.title}</p>
           <p><strong className="text-slate-950">商品类目：</strong>{report.input.category}</p>
-          <p><strong className="text-slate-950">商品价格：</strong>{report.input.price}</p>
+          <p><strong className="text-slate-950">商品价格：</strong>{formatProductPrice(report.input)}</p>
           <p><strong className="text-slate-950">周销量：</strong>{formatOptionalNumber(report.input.weeklySales)}</p>
           <p><strong className="text-slate-950">月销量：</strong>{formatOptionalNumber(report.input.monthlySales)}</p>
           <p><strong className="text-slate-950">商品评分：</strong>{formatOptionalNumber(report.input.rating)}</p>

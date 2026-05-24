@@ -13,21 +13,39 @@ const confidenceLabelMap: Record<NonNullable<RecognizedProductFields["confidence
 };
 
 function formatValue(value: string | number | undefined): string {
-  return value !== undefined && value !== "" ? String(value) : "未识别";
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? String(value) : "未识别";
+  }
+
+  return value !== undefined && value.trim().length > 0 ? value : "未识别";
 }
 
 function hasManualValue(value: string | number | undefined): boolean {
-  return value !== undefined && value !== "" && !(typeof value === "number" && value <= 0);
+  if (typeof value === "number") {
+    return Number.isFinite(value) && value > 0;
+  }
+
+  return value !== undefined && value.trim().length > 0;
+}
+
+function formatRecognizedPrice(recognizedFields: RecognizedProductFields): string | number | undefined {
+  if (recognizedFields.priceDisplay && recognizedFields.priceDisplay.trim().length > 0) {
+    return recognizedFields.priceDisplay;
+  }
+
+  return recognizedFields.price;
 }
 
 function FieldRow({
   label,
   value,
-  manualValue
+  manualValue,
+  detail
 }: {
   label: string;
   value: string | number | undefined;
   manualValue?: string | number;
+  detail?: string;
 }) {
   const manualWins = hasManualValue(manualValue);
 
@@ -35,8 +53,9 @@ function FieldRow({
     <div className="rounded-md bg-slate-50 p-3">
       <p className="text-xs font-medium text-slate-500">{label}</p>
       <p className="mt-1 text-sm font-medium text-slate-900">{formatValue(value)}</p>
+      {detail ? <p className="mt-1 text-xs text-slate-500">{detail}</p> : null}
       <p className="mt-1 text-xs text-slate-500">
-        {value === undefined || value === "" ? "未识别" : "来自截图识别"}
+        {formatValue(value) === "未识别" ? "未识别" : "来自截图识别"}
         {manualWins ? "；当前报告优先采用手动填写值" : ""}
       </p>
     </div>
@@ -66,7 +85,12 @@ export function RecognizedFieldsPanel({
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <FieldRow label="商品标题" value={recognizedFields.title} manualValue={manualProduct?.title} />
         <FieldRow label="商品类目" value={recognizedFields.category} manualValue={manualProduct?.category} />
-        <FieldRow label="商品价格" value={recognizedFields.price} manualValue={manualProduct?.price} />
+        <FieldRow
+          label="商品价格"
+          value={formatRecognizedPrice(recognizedFields)}
+          manualValue={manualProduct?.price}
+          detail={recognizedFields.priceCurrency ? `\u5e01\u79cd\uff1a${recognizedFields.priceCurrency}` : undefined}
+        />
         <FieldRow label="周销量" value={recognizedFields.weeklySales} manualValue={manualProduct?.weeklySales} />
         <FieldRow label="月销量" value={recognizedFields.monthlySales} manualValue={manualProduct?.monthlySales} />
         <FieldRow label="商品评分" value={recognizedFields.rating} manualValue={manualProduct?.rating} />

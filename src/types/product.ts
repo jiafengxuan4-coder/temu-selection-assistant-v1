@@ -6,6 +6,8 @@ export type ProductInput = {
   title: string;
   category: string;
   price: number;
+  priceDisplay?: string;
+  priceCurrency?: string;
   weeklySales?: number;
   monthlySales?: number;
   rating?: number;
@@ -16,6 +18,8 @@ export type RecognizedProductFields = {
   title?: string;
   category?: string;
   price?: number;
+  priceDisplay?: string;
+  priceCurrency?: string;
   weeklySales?: number;
   monthlySales?: number;
   rating?: number;

@@ -8,6 +8,7 @@ import type {
   RecommendationDirectionType,
   RecommendationLevel
 } from "@/types/recommendation";
+import type { ProductInput } from "@/types/product";
 
 const factorLabelMap: Record<HotProductFactorType, string> = {
   price: "价格因素",
@@ -52,6 +53,12 @@ const recommendationTypeLabelMap: Record<RecommendationDirectionType, string> = 
 
 function formatOptionalNumber(value: number | undefined): string {
   return typeof value === "number" ? String(value) : "未提供";
+}
+
+function formatProductPrice(product: ProductInput): string {
+  return product.priceDisplay && product.priceDisplay.trim().length > 0
+    ? product.priceDisplay
+    : String(product.price);
 }
 
 function formatList(items: string[]): string {
@@ -123,7 +130,7 @@ export function formatAnalysisReportText(report: AnalysisReport): string {
     "",
     `- 商品标题：${report.input.title}`,
     `- 商品类目：${report.input.category}`,
-    `- 商品价格：${report.input.price}`,
+    `- 商品价格：${formatProductPrice(report.input)}`,
     `- 周销量：${formatOptionalNumber(report.input.weeklySales)}`,
     `- 月销量：${formatOptionalNumber(report.input.monthlySales)}`,
     `- 商品评分：${formatOptionalNumber(report.input.rating)}`,

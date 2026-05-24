@@ -21,6 +21,10 @@ function parseOptionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
+function hasManualPrice(value: unknown): boolean {
+  return typeof parsePositiveNumber(value) === "number";
+}
+
 function parseProduct(value: Record<string, unknown>): ProductInput | null {
   const title = parseOptionalString(value.title);
   const category = parseOptionalString(value.category);
@@ -34,6 +38,8 @@ function parseProduct(value: Record<string, unknown>): ProductInput | null {
     title,
     category,
     price,
+    priceDisplay: parseOptionalString(value.priceDisplay),
+    priceCurrency: parseOptionalString(value.priceCurrency),
     weeklySales: parseOptionalNumber(value.weeklySales),
     monthlySales: parseOptionalNumber(value.monthlySales),
     rating: parseOptionalNumber(value.rating),
@@ -55,6 +61,10 @@ function mergeRecognizedProduct(
     title: parseOptionalString(rawProduct.title) || recognizedProduct?.title,
     category: parseOptionalString(rawProduct.category) || recognizedProduct?.category,
     price: parsePositiveNumber(rawProduct.price) ?? recognizedProduct?.price,
+    priceDisplay: parseOptionalString(rawProduct.priceDisplay)
+      || (hasManualPrice(rawProduct.price) ? undefined : recognizedProduct?.priceDisplay),
+    priceCurrency: parseOptionalString(rawProduct.priceCurrency)
+      || (hasManualPrice(rawProduct.price) ? undefined : recognizedProduct?.priceCurrency),
     weeklySales: parseOptionalNumber(rawProduct.weeklySales) ?? recognizedProduct?.weeklySales,
     monthlySales: parseOptionalNumber(rawProduct.monthlySales) ?? recognizedProduct?.monthlySales,
     rating: parseOptionalNumber(rawProduct.rating) ?? recognizedProduct?.rating,
@@ -92,6 +102,8 @@ function toRecognizedFieldsSummary(
     title: recognizedProduct.title,
     category: recognizedProduct.category,
     price: recognizedProduct.price,
+    priceDisplay: recognizedProduct.priceDisplay,
+    priceCurrency: recognizedProduct.priceCurrency,
     weeklySales: recognizedProduct.weeklySales,
     monthlySales: recognizedProduct.monthlySales,
     rating: recognizedProduct.rating,
@@ -143,6 +155,8 @@ export async function POST(request: NextRequest) {
       title: product.title,
       category: product.category,
       price: product.price,
+      priceDisplay: product.priceDisplay,
+      priceCurrency: product.priceCurrency,
       weeklySales: product.weeklySales,
       monthlySales: product.monthlySales,
       rating: product.rating,
