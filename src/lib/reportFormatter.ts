@@ -173,6 +173,6 @@ export function formatAnalysisReportText(report: AnalysisReport): string {
     "",
     formatList(report.actionSuggestions),
     "",
-    "免责声明：本报告为选品辅助分析，不保证产品一定能爆，也不保证一定通过核价。上架前仍需结合供应链、1688 同款情况、核价结果和实际运营数据进一步判断。"
+    "免责声明：本报告为选品辅助分析，不代表产品会爆，也不代表会通过核价。上架前仍需结合供应链、1688 同款情况、核价结果和实际运营数据进一步判断。"
   ].join("\n");
 }
