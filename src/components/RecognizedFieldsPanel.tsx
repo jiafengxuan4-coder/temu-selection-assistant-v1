@@ -47,15 +47,16 @@ function FieldRow({
   manualValue?: string | number;
   detail?: string;
 }) {
+  const formattedValue = formatValue(value);
   const manualWins = hasManualValue(manualValue);
 
   return (
     <div className="rounded-md bg-slate-50 p-3">
       <p className="text-xs font-medium text-slate-500">{label}</p>
-      <p className="mt-1 text-sm font-medium text-slate-900">{formatValue(value)}</p>
+      <p className="mt-1 text-sm font-medium text-slate-900">{formattedValue}</p>
       {detail ? <p className="mt-1 text-xs text-slate-500">{detail}</p> : null}
       <p className="mt-1 text-xs text-slate-500">
-        {formatValue(value) === "未识别" ? "未识别" : "来自截图识别"}
+        {formattedValue === "未识别" ? "未识别" : "来自截图识别"}
         {manualWins ? "；当前报告优先采用手动填写值" : ""}
       </p>
     </div>
@@ -83,13 +84,20 @@ export function RecognizedFieldsPanel({
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        {recognizedFields.imageCount ? (
+          <div className="rounded-md bg-slate-50 p-3 sm:col-span-2">
+            <p className="text-xs font-medium text-slate-500">综合识别截图数</p>
+            <p className="mt-1 text-sm font-medium text-slate-900">{recognizedFields.imageCount} 张</p>
+            <p className="mt-1 text-xs text-slate-500">来自本次上传的商品截图</p>
+          </div>
+        ) : null}
         <FieldRow label="商品标题" value={recognizedFields.title} manualValue={manualProduct?.title} />
         <FieldRow label="商品类目" value={recognizedFields.category} manualValue={manualProduct?.category} />
         <FieldRow
           label="商品价格"
           value={formatRecognizedPrice(recognizedFields)}
           manualValue={manualProduct?.price}
-          detail={recognizedFields.priceCurrency ? `\u5e01\u79cd\uff1a${recognizedFields.priceCurrency}` : undefined}
+          detail={recognizedFields.priceCurrency ? `币种：${recognizedFields.priceCurrency}` : undefined}
         />
         <FieldRow label="周销量" value={recognizedFields.weeklySales} manualValue={manualProduct?.weeklySales} />
         <FieldRow label="月销量" value={recognizedFields.monthlySales} manualValue={manualProduct?.monthlySales} />

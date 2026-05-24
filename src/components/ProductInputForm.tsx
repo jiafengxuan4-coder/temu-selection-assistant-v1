@@ -1,9 +1,9 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { ImageUploadPreview } from "@/components/ImageUploadPreview";
-import type { ProductInput } from "@/types/product";
+import type { ProductImageInput, ProductInput } from "@/types/product";
 
 type ProductInputFormProps = {
   onSubmit: (product: ProductInput) => void;
@@ -22,10 +22,9 @@ type FormState = {
   reviewsText: string;
 };
 
-type ImageState = {
-  imageBase64?: string;
-  imageMimeType?: string;
-  imageFileName?: string;
+type ImageState = ProductImageInput & {
+  imageFileSize: number;
+  imagePreviewUrl: string;
 };
 
 const initialFormState: FormState = {
@@ -51,6 +50,7 @@ const petLeashExample: FormState = {
 
 const allowedImageTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
 const maxImageSize = 5 * 1024 * 1024;
+const maxImageCount = 5;
 
 function toOptionalNumber(value: string): number | undefined {
   if (!value.trim()) {
@@ -67,13 +67,18 @@ function formatFileSize(size: number): string {
 
 function toProductInput(
   formState: FormState,
-  imageState?: ImageState,
+  imageStates: ImageState[] = [],
   allowIncomplete = false
 ): ProductInput | null {
   const title = formState.title.trim();
   const category = formState.category.trim();
   const price = Number(formState.price);
   const hasValidPrice = Number.isFinite(price) && price > 0;
+  const images = imageStates.map((image) => ({
+    imageBase64: image.imageBase64,
+    imageMimeType: image.imageMimeType,
+    imageFileName: image.imageFileName
+  }));
 
   if ((!title || !category || !hasValidPrice) && !allowIncomplete) {
     return null;
@@ -87,9 +92,10 @@ function toProductInput(
     monthlySales: toOptionalNumber(formState.monthlySales),
     rating: toOptionalNumber(formState.rating),
     reviewsText: formState.reviewsText.trim() || undefined,
-    imageBase64: imageState?.imageBase64,
-    imageMimeType: imageState?.imageMimeType,
-    imageFileName: imageState?.imageFileName
+    images,
+    imageBase64: images[0]?.imageBase64,
+    imageMimeType: images[0]?.imageMimeType,
+    imageFileName: images[0]?.imageFileName
   };
 }
 
@@ -101,25 +107,13 @@ export function ProductInputForm({
 }: ProductInputFormProps) {
   const [formState, setFormState] = useState<FormState>(initialFormState);
   const [error, setError] = useState<string>("");
-  const [imageFileName, setImageFileName] = useState<string>("");
-  const [imageFileSize, setImageFileSize] = useState<number>(0);
-  const [imagePreviewUrl, setImagePreviewUrl] = useState<string>("");
-  const [imageMimeType, setImageMimeType] = useState<string>("");
-  const [imageBase64, setImageBase64] = useState<string>("");
+  const [imageStates, setImageStates] = useState<ImageState[]>([]);
   const [imageError, setImageError] = useState<string>("");
-
-  function getImageState(nextBase64 = imageBase64, nextMimeType = imageMimeType, nextFileName = imageFileName): ImageState {
-    return {
-      imageBase64: nextBase64 || undefined,
-      imageMimeType: nextMimeType || undefined,
-      imageFileName: nextFileName || undefined
-    };
-  }
 
   function updateField(field: keyof FormState, value: string) {
     setFormState((current) => {
       const nextState = { ...current, [field]: value };
-      onDraftChange?.(toProductInput(nextState, getImageState()));
+      onDraftChange?.(toProductInput(nextState, imageStates));
       return nextState;
     });
   }
@@ -127,75 +121,90 @@ export function ProductInputForm({
   function fillExampleCase() {
     setFormState(petLeashExample);
     setError("");
-    onDraftChange?.(toProductInput(petLeashExample, getImageState()));
+    onDraftChange?.(toProductInput(petLeashExample, imageStates));
+  }
+
+  function clearImages() {
+    setImageStates([]);
+    setImageError("");
   }
 
   function clearForm() {
     setFormState(initialFormState);
     setError("");
-    clearImage();
+    clearImages();
     onDraftChange?.(null);
     onClear?.();
   }
 
-  function clearImage() {
-    setImageFileName("");
-    setImageFileSize(0);
-    setImagePreviewUrl("");
-    setImageMimeType("");
-    setImageBase64("");
-    setImageError("");
-    onDraftChange?.(toProductInput(formState));
+  function readImageFile(file: File): Promise<ImageState> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onload = () => {
+        if (typeof reader.result !== "string") {
+          reject(new Error("图片读取失败，请重新选择截图。"));
+          return;
+        }
+
+        resolve({
+          imageBase64: reader.result,
+          imageMimeType: file.type,
+          imageFileName: file.name,
+          imageFileSize: file.size,
+          imagePreviewUrl: reader.result
+        });
+      };
+
+      reader.onerror = () => reject(new Error("图片读取失败，请重新选择截图。"));
+      reader.readAsDataURL(file);
+    });
   }
 
-  function handleImageChange(file: File | null) {
+  async function handleImagesChange(fileList: FileList | null) {
     setImageError("");
+    const files = Array.from(fileList ?? []);
 
-    if (!file) {
+    if (files.length === 0) {
       return;
     }
 
-    if (!allowedImageTypes.includes(file.type)) {
-      clearImage();
+    if (imageStates.length + files.length > maxImageCount) {
+      setImageError("最多支持上传 5 张截图，请删除部分图片后重试。");
+      return;
+    }
+
+    if (files.some((file) => !allowedImageTypes.includes(file.type))) {
       setImageError("仅支持上传 PNG、JPG、JPEG、WEBP 图片。");
       return;
     }
 
-    if (file.size > maxImageSize) {
-      clearImage();
+    if (files.some((file) => file.size > maxImageSize)) {
       setImageError("图片过大，请上传 5MB 以内的截图。");
       return;
     }
 
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      if (typeof reader.result !== "string") {
-        setImageError("图片读取失败，请重新选择截图。");
-        return;
-      }
-
-      setImageFileName(file.name);
-      setImageFileSize(file.size);
-      setImageMimeType(file.type);
-      setImageBase64(reader.result);
-      setImagePreviewUrl(reader.result);
-      onDraftChange?.(toProductInput(formState, getImageState(reader.result, file.type, file.name)));
-    };
-
-    reader.onerror = () => {
-      clearImage();
+    try {
+      const nextImages = [...imageStates, ...(await Promise.all(files.map(readImageFile)))];
+      setImageStates(nextImages);
+      onDraftChange?.(toProductInput(formState, nextImages));
+    } catch {
       setImageError("图片读取失败，请重新选择截图。");
-    };
+    }
+  }
 
-    reader.readAsDataURL(file);
+  function removeImage(index: number) {
+    const nextImages = imageStates.filter((_, currentIndex) => currentIndex !== index);
+    setImageStates(nextImages);
+    setImageError("");
+    onDraftChange?.(toProductInput(formState, nextImages));
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const hasImage = Boolean(imageBase64);
-    const product = toProductInput(formState, getImageState(), hasImage);
+    const hasImages = imageStates.length > 0;
+    const product = toProductInput(formState, imageStates, hasImages);
 
     if (!product) {
       setError("请填写商品标题、商品类目，并确保商品价格大于 0；或先上传商品截图让系统尝试识别。");
@@ -238,12 +247,14 @@ export function ProductInputForm({
 
       <div className="mt-5 space-y-4">
         <ImageUploadPreview
-          previewUrl={imagePreviewUrl}
-          fileName={imageFileName}
-          fileSizeText={imageFileSize ? formatFileSize(imageFileSize) : ""}
+          images={imageStates.map((image) => ({
+            previewUrl: image.imagePreviewUrl,
+            fileName: image.imageFileName,
+            fileSizeText: formatFileSize(image.imageFileSize)
+          }))}
           error={imageError}
-          onFileChange={handleImageChange}
-          onRemove={clearImage}
+          onFilesChange={handleImagesChange}
+          onRemove={removeImage}
         />
 
         <label className="block">

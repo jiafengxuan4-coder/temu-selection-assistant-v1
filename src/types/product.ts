@@ -1,8 +1,15 @@
+export type ProductImageInput = {
+  imageBase64: string;
+  imageMimeType: string;
+  imageFileName: string;
+};
+
 export type ProductInput = {
   imageFileName?: string;
   imageUrl?: string;
   imageBase64?: string;
   imageMimeType?: string;
+  images?: ProductImageInput[];
   title: string;
   category: string;
   price: number;
@@ -28,6 +35,7 @@ export type RecognizedProductFields = {
   confidence?: "low" | "medium" | "high" | "unknown";
   missingFields?: string[];
   warnings?: string[];
+  imageCount?: number;
   rawText?: string;
 };
 

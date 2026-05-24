@@ -1,6 +1,6 @@
-import { getAIProvider, getAIProviderConfig } from "@/lib/ai/providers";
-import type { RecognizedProductFields } from "@/types/product";
+﻿import { getAIProvider, getAIProviderConfig } from "@/lib/ai/providers";
 import type { AIChatMessage } from "@/lib/ai/providers";
+import type { ProductImageInput, RecognizedProductFields } from "@/types/product";
 
 type RecognizeProductFromImageInput = {
   imageBase64: string;
@@ -29,7 +29,7 @@ function pickString(value: unknown): string | undefined {
     return undefined;
   }
 
-  const normalized = value.trim().replace(/^[\s:：,，。.-]+|[\s:：,，。.-]+$/g, "");
+  const normalized = value.trim().replace(/^[\s:：，、。-]+|[\s:：，、。-]+$/g, "");
   return normalized.length > 0 && normalized.toLowerCase() !== "null" ? normalized : undefined;
 }
 
@@ -245,7 +245,7 @@ function calculateConfidence(result: RecognizedProductFields): RecognizedProduct
   return "unknown";
 }
 
-function parseRecognizedFields(rawText: string): RecognizedProductFields {
+function parseRecognizedFields(rawText: string, imageCount: number): RecognizedProductFields {
   const parsed = JSON.parse(cleanJsonText(rawText)) as Record<string, unknown>;
   const priceInfo = parsePriceInfo(parsed.price, parsed.priceDisplay, parsed.priceCurrency);
   const result: RecognizedProductFields = {
@@ -259,6 +259,7 @@ function parseRecognizedFields(rawText: string): RecognizedProductFields {
     rating: parseRating(parsed.rating),
     reviewCount: parseSalesCount(parsed.reviewCount),
     reviewsText: pickString(parsed.reviewsText),
+    imageCount,
     rawText: pickString(parsed.rawText) ?? rawText
   };
 
@@ -270,37 +271,18 @@ function parseRecognizedFields(rawText: string): RecognizedProductFields {
   };
 }
 
-function fallbackRecognition(rawText = ""): RecognizedProductFields {
+function fallbackRecognition(rawText = "", imageCount?: number): RecognizedProductFields {
   return {
     confidence: "unknown",
     missingFields: ["title", "category", "price"],
     warnings: ["截图识别失败，建议手动填写商品信息后重新生成报告。"],
+    imageCount,
     rawText
   };
 }
 
-export async function recognizeProductFromImage({
-  imageBase64
-}: RecognizeProductFromImageInput): Promise<RecognizedProductFields> {
-  try {
-    const config = getAIProviderConfig();
-    const provider = getAIProvider(config.provider);
-    const visionConfig = {
-      ...config,
-      model: process.env.AI_VISION_MODEL || "qwen-vl-plus"
-    };
-    const messages: AIChatMessage[] = [
-      {
-        role: "system",
-        content:
-          "你是 TEMU 商品截图识别助手。你的任务是从商品截图中提取结构化商品信息。只做识别，不做选品判断，不做利润判断，不要编造截图中没有的信息。"
-      },
-      {
-        role: "user",
-        content: [
-          {
-            type: "text",
-            text: `请识别这张 TEMU 商品截图里的商品信息，只返回 JSON，不要 markdown，不要解释，不要代码块。
+function buildRecognitionPrompt(imageCount: number): string {
+  return `请综合识别这 ${imageCount} 张 TEMU 商品截图里的商品信息。这些图片来自同一个商品，不同截图可能包含标题、价格、销量、评分、评论、详情页卖点或规格变体。请合并识别结果，最终只返回一份 JSON，不要 markdown，不要解释，不要代码块。
 返回格式：
 {
   "title": null,
@@ -319,41 +301,83 @@ export async function recognizeProductFromImage({
   "rawText": ""
 }
 
-价格字段要求：
-1. 如果截图中价格带币种符号，priceDisplay 必须保留原始币种符号。
-2. 如果截图显示 €9.79，priceDisplay 返回 "€9.79"，priceCurrency 返回 "EUR"，price 返回 9.79。
-3. 如果截图显示 $9.79，priceDisplay 返回 "$9.79"，priceCurrency 返回 "USD"，price 返回 9.79。
-4. 如果截图显示 US$9.79，priceDisplay 返回 "US$9.79"，priceCurrency 返回 "USD"，price 返回 9.79。
-5. 如果截图显示 ￥69 或 ¥69，priceDisplay 返回原文，priceCurrency 返回 "CNY"，price 返回 69。
-6. 如果截图显示 £8.99 / CA$12.99 / AU$15.99，也要保留 priceDisplay，并分别返回 GBP / CAD / AUD。
-7. 如果无法判断币种，但识别到价格数字，priceDisplay 保留截图原文，priceCurrency 返回 "UNKNOWN"。
-
 规则：
 1. 只提取截图中真实出现的信息，不要编造。
 2. title 识别商品标题或最接近的商品名称。
 3. price 只提取商品售价，返回数字。
-4. weeklySales 和 monthlySales 要区分周期。
-5. 如果截图只出现 sold / 已售 / 销量，但无法判断是周销量还是月销量，优先放入 monthlySales，并在 rawText 说明周期不确定。
-6. rating 返回 0-5 的数字。
-7. reviewCount 返回评论数量，如果看不到则为 null。
-8. reviewsText 通常为空，除非截图中真的有评论内容。
-9. category 如果截图没有明确类目，可以根据商品外观粗略判断，但 confidence 不得为 high。
-10. missingFields 写出没识别到的字段。
-11. 识别不到的字段必须返回 null，不要猜销量、评分、评论。
-12. 如果图片模糊、裁剪严重、关键信息缺失，请在 warnings 中用中文说明。`
-          },
-          {
-            type: "image_url",
-            image_url: {
-              url: imageBase64
-            }
-          }
-        ]
+4. priceDisplay 必须保留截图中的原始价格和币种符号，例如 €9.79、$9.79、US$9.79、￥69、£8.99、CA$12.99、AU$15.99。
+5. priceCurrency 返回 USD / EUR / CNY / GBP / CAD / AUD / JPY / KRW / UNKNOWN / null。
+6. weeklySales 和 monthlySales 要区分周期。
+7. 如果截图只出现 sold / 已售 / 销量，但无法判断是周销量还是月销量，优先放入 monthlySales，并在 rawText 说明周期不确定。
+8. rating 返回 0-5 的数字。
+9. reviewCount 返回评论数量，如果看不到则为 null。
+10. reviewsText 通常为空，除非截图中真的有评论内容。
+11. category 如果截图没有明确类目，可以根据商品外观粗略判断，但 confidence 不得为 high。
+12. missingFields 写出没识别到的字段。
+13. 识别不到的字段必须返回 null，不要猜销量、评分、评论。
+14. 如果图片模糊、裁剪严重、关键信息缺失，请在 warnings 中用中文说明。
+15. 多张截图来自同一个商品，请综合识别，不要逐张重复输出。
+16. 如果不同截图字段冲突，以更清晰、更完整、更像商品详情页主信息的字段为准。
+17. 如果多张截图信息可能不一致，在 warnings 中加入“多张截图信息可能存在不一致，建议人工核对”。
+18. 如果某张图无法识别，不影响其他图片的信息提取。`;
+}
+
+export async function recognizeProductFromImage({
+  imageBase64,
+  imageMimeType,
+  imageFileName
+}: RecognizeProductFromImageInput): Promise<RecognizedProductFields> {
+  return recognizeProductFromImages([
+    {
+      imageBase64,
+      imageMimeType: imageMimeType || "image/png",
+      imageFileName: imageFileName || "product-screenshot"
+    }
+  ]);
+}
+
+export async function recognizeProductFromImages(
+  images: ProductImageInput[]
+): Promise<RecognizedProductFields> {
+  const limitedImages = images.slice(0, 5);
+
+  if (limitedImages.length === 0) {
+    return fallbackRecognition("未提供商品截图", 0);
+  }
+
+  try {
+    const config = getAIProviderConfig();
+    const provider = getAIProvider(config.provider);
+    const visionConfig = {
+      ...config,
+      model: process.env.AI_VISION_MODEL || "qwen-vl-plus"
+    };
+    const content: AIChatMessage["content"] = [
+      {
+        type: "text",
+        text: buildRecognitionPrompt(limitedImages.length)
+      },
+      ...limitedImages.map((image) => ({
+        type: "image_url" as const,
+        image_url: {
+          url: image.imageBase64
+        }
+      }))
+    ];
+    const messages: AIChatMessage[] = [
+      {
+        role: "system",
+        content:
+          "你是 TEMU 商品截图识别助手。你的任务是从同一个商品的 1-5 张截图中提取结构化商品信息。只做识别，不做选品判断，不做利润判断，不要编造截图中没有的信息。"
+      },
+      {
+        role: "user",
+        content
       }
     ];
     const response = await provider.chatCompletion(messages, visionConfig);
 
-    return parseRecognizedFields(response.text);
+    return parseRecognizedFields(response.text, limitedImages.length);
   } catch (error) {
     const message = error instanceof Error ? error.message : "截图识别失败";
     console.warn("[IMAGE_RECOGNITION_FALLBACK]", {
@@ -361,6 +385,6 @@ export async function recognizeProductFromImage({
       message
     });
 
-    return fallbackRecognition(message);
+    return fallbackRecognition(message, limitedImages.length);
   }
 }

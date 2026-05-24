@@ -49,7 +49,9 @@ export async function analyzeProductFromClient(
       };
     }
 
-    if (product.imageBase64 && (!product.title || !product.category || product.price <= 0)) {
+    const hasImages = Boolean(product.imageBase64) || Boolean(product.images?.length);
+
+    if (hasImages && (!product.title || !product.category || product.price <= 0)) {
       return {
         report: null,
         source: "mock_fallback",

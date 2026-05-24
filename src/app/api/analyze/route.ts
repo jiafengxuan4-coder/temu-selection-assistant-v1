@@ -1,8 +1,8 @@
-import { NextResponse, type NextRequest } from "next/server";
+﻿import { NextResponse, type NextRequest } from "next/server";
 import { analyzeHotProductWithAI } from "@/lib/ai/analyzeHotProductWithAI";
-import { recognizeProductFromImage } from "@/lib/ai/recognizeProductFromImage";
+import { recognizeProductFromImage, recognizeProductFromImages } from "@/lib/ai/recognizeProductFromImage";
 import type { AnalyzeProductRequest, AnalyzeProductResponse } from "@/types/ai";
-import type { ProductInput, RecognizedProductFields } from "@/types/product";
+import type { ProductImageInput, ProductInput, RecognizedProductFields } from "@/types/product";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -18,7 +18,27 @@ function parsePositiveNumber(value: unknown): number | undefined {
 }
 
 function parseOptionalString(value: unknown): string | undefined {
-  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+function parseImageInputs(value: unknown): ProductImageInput[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .slice(0, 5)
+    .filter(isRecord)
+    .map((item) => {
+      const imageBase64 = parseOptionalString(item.imageBase64);
+      const imageMimeType = parseOptionalString(item.imageMimeType);
+      const imageFileName = parseOptionalString(item.imageFileName);
+
+      return imageBase64 && imageMimeType && imageFileName
+        ? { imageBase64, imageMimeType, imageFileName }
+        : null;
+    })
+    .filter((item): item is ProductImageInput => item !== null);
 }
 
 function hasManualPrice(value: unknown): boolean {
@@ -47,7 +67,8 @@ function parseProduct(value: Record<string, unknown>): ProductInput | null {
     imageUrl: parseOptionalString(value.imageUrl),
     imageFileName: parseOptionalString(value.imageFileName),
     imageBase64: parseOptionalString(value.imageBase64),
-    imageMimeType: parseOptionalString(value.imageMimeType)
+    imageMimeType: parseOptionalString(value.imageMimeType),
+    images: parseImageInputs(value.images)
   };
 }
 
@@ -72,7 +93,8 @@ function mergeRecognizedProduct(
     imageUrl: parseOptionalString(rawProduct.imageUrl),
     imageFileName: parseOptionalString(rawProduct.imageFileName),
     imageBase64: parseOptionalString(rawProduct.imageBase64),
-    imageMimeType: parseOptionalString(rawProduct.imageMimeType)
+    imageMimeType: parseOptionalString(rawProduct.imageMimeType),
+    images: parseImageInputs(rawProduct.images)
   };
 }
 
@@ -111,7 +133,8 @@ function toRecognizedFieldsSummary(
     reviewsText: recognizedProduct.reviewsText,
     confidence: recognizedProduct.confidence ?? "unknown",
     missingFields,
-    warnings
+    warnings,
+    imageCount: recognizedProduct.imageCount
   };
 }
 
@@ -130,19 +153,23 @@ export async function POST(request: NextRequest) {
     return jsonResponse({ ok: false, error: "请求体缺少 product。" }, 400);
   }
 
+  const imageInputs = parseImageInputs(rawProduct.images);
   const imageBase64 = parseOptionalString(rawProduct.imageBase64);
-  const recognizedProduct = imageBase64
-    ? await recognizeProductFromImage({
-        imageBase64,
-        imageMimeType: parseOptionalString(rawProduct.imageMimeType),
-        imageFileName: parseOptionalString(rawProduct.imageFileName)
-      })
-    : null;
+  const hasSubmittedImages = imageInputs.length > 0 || Boolean(imageBase64);
+  const recognizedProduct = imageInputs.length > 0
+    ? await recognizeProductFromImages(imageInputs)
+    : imageBase64
+      ? await recognizeProductFromImage({
+          imageBase64,
+          imageMimeType: parseOptionalString(rawProduct.imageMimeType),
+          imageFileName: parseOptionalString(rawProduct.imageFileName)
+        })
+      : null;
   const mergedProduct = mergeRecognizedProduct(rawProduct, recognizedProduct);
   const product = parseProduct(mergedProduct);
 
   if (!product) {
-    const error = imageBase64
+    const error = hasSubmittedImages
       ? "截图识别未能完整获取商品标题、类目或价格，请手动补充后再生成报告。"
       : "请求体缺少 title、category 或有效 price，且 price 必须大于 0。";
 
@@ -150,7 +177,6 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const hasImageBase64 = Boolean(imageBase64);
     const analysisProduct: ProductInput = {
       title: product.title,
       category: product.category,
@@ -165,7 +191,7 @@ export async function POST(request: NextRequest) {
       imageFileName: product.imageFileName
     };
     const result = await analyzeHotProductWithAI(analysisProduct);
-    const imageMessage = hasImageBase64 ? "已启用 Qwen-VL 识别商品截图。" : "";
+    const imageMessage = hasSubmittedImages ? "已启用 Qwen-VL 综合识别商品截图。" : "";
     const message = [result.message, imageMessage].filter(Boolean).join(" ");
 
     return jsonResponse(
