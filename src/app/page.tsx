@@ -3,8 +3,11 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { AnalysisReportView } from "@/components/AnalysisReportView";
+import { DisclaimerCard } from "@/components/DisclaimerCard";
+import { FeedbackCard } from "@/components/FeedbackCard";
 import { ProductInputForm } from "@/components/ProductInputForm";
 import { RecognizedFieldsPanel } from "@/components/RecognizedFieldsPanel";
+import { UsageGuideCard } from "@/components/UsageGuideCard";
 import { analyzeProductFromClient } from "@/lib/clientAnalyze";
 import type { ClientAnalysisSource } from "@/lib/clientAnalyze";
 import type { ProductInput, RecognizedProductFields } from "@/types/product";
@@ -196,6 +199,12 @@ export default function Home() {
           </div>
         </header>
 
+        <div className="grid gap-4 lg:grid-cols-3">
+          <UsageGuideCard />
+          <DisclaimerCard />
+          <FeedbackCard />
+        </div>
+
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,420px)_1fr]">
           <ProductInputForm
             onSubmit={handleSubmit}
@@ -229,4 +238,5 @@ export default function Home() {
     </main>
   );
 }
+
 

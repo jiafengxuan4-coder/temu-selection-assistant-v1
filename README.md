@@ -34,7 +34,7 @@ http://localhost:3000
 
 1. 复制 `.env.example` 为 `.env.local`
 2. 配置 `AI_PROVIDER`、`AI_API_KEY`、`AI_BASE_URL`、`AI_MODEL`
-3. 配置 `ALLOWED_PHONE_NUMBERS` 和 `ADMIN_WECHAT`
+3. 配置 `ALLOWED_PHONE_NUMBERS`、`ADMIN_WECHAT` 和 `NEXT_PUBLIC_ADMIN_WECHAT`
 4. 重启 `npm.cmd run dev`
 
 支持的 AI Provider：
@@ -50,6 +50,8 @@ http://localhost:3000
 
 当前 MVP 使用手机号白名单限制访问。`ALLOWED_PHONE_NUMBERS` 使用英文逗号分隔多个手机号，例如：`13800138000,13900139000`。
 
+`ADMIN_WECHAT` 用于服务端手机号白名单接口提示；`NEXT_PUBLIC_ADMIN_WECHAT` 用于前端页面展示反馈微信。两者可以填写同一个微信号。
+
 不要把 `.env.local` 提交到 Git。
 
 ## 部署环境变量
@@ -63,6 +65,7 @@ AI_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 AI_MODEL=qwen-plus
 ALLOWED_PHONE_NUMBERS=13800138000,13900139000
 ADMIN_WECHAT=your_wechat_id
+NEXT_PUBLIC_ADMIN_WECHAT=your_wechat_id
 ```
 
 可选 provider：
@@ -78,6 +81,7 @@ ADMIN_WECHAT=your_wechat_id
 
 - `ALLOWED_PHONE_NUMBERS`
 - `ADMIN_WECHAT`
+- `NEXT_PUBLIC_ADMIN_WECHAT`
 
 未配置 `ALLOWED_PHONE_NUMBERS` 时，本地开发环境会放行；生产环境会拒绝访问并提示联系管理员。
 
@@ -107,4 +111,5 @@ ADMIN_WECHAT=your_wechat_id
 - 支付
 - 自动上架
 - 自动推广
+
 
