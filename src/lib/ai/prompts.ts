@@ -40,6 +40,8 @@ export function buildHotProductAnalysisUserPrompt(product: ProductInput): string
       price: product.price,
       priceDisplay: product.priceDisplay ?? "unknown",
       priceCurrency: product.priceCurrency ?? "unknown",
+      priceSource: product.priceSource ?? "unknown",
+      priceCandidates: product.priceCandidates ?? [],
       weeklySales: product.weeklySales ?? "unknown",
       monthlySales: product.monthlySales ?? "unknown",
       rating: product.rating ?? "unknown",

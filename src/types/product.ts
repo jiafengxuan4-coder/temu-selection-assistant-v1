@@ -4,6 +4,21 @@ export type ProductImageInput = {
   imageFileName: string;
 };
 
+export type ProductPriceSource =
+  | "current_sale_price"
+  | "discount_price"
+  | "original_price"
+  | "coupon_price"
+  | "uncertain";
+
+export type ProductPriceCandidate = {
+  value: number;
+  display: string;
+  currency?: string;
+  source?: ProductPriceSource | "other";
+  reason?: string;
+};
+
 export type ProductInput = {
   imageFileName?: string;
   imageUrl?: string;
@@ -15,6 +30,8 @@ export type ProductInput = {
   price: number;
   priceDisplay?: string;
   priceCurrency?: string;
+  priceSource?: ProductPriceSource;
+  priceCandidates?: ProductPriceCandidate[];
   weeklySales?: number;
   monthlySales?: number;
   rating?: number;
@@ -27,6 +44,8 @@ export type RecognizedProductFields = {
   price?: number;
   priceDisplay?: string;
   priceCurrency?: string;
+  priceSource?: ProductPriceSource;
+  priceCandidates?: ProductPriceCandidate[];
   weeklySales?: number;
   monthlySales?: number;
   rating?: number;

@@ -51,6 +51,10 @@ function formatProductPrice(product: ProductInput): string {
     : String(product.price);
 }
 
+function isPriceUncertain(product: ProductInput): boolean {
+  return product.priceSource === "uncertain";
+}
+
 function getStatusLabel(value: boolean): string {
   return value ? "完整" : "缺失";
 }
@@ -112,7 +116,13 @@ export function AnalysisReportView({
         <div className="mt-4 grid gap-3 text-sm leading-6 text-slate-700 sm:grid-cols-2">
           <p><strong className="text-slate-950">商品标题：</strong>{report.input.title}</p>
           <p><strong className="text-slate-950">商品类目：</strong>{report.input.category}</p>
-          <p><strong className="text-slate-950">商品价格：</strong>{formatProductPrice(report.input)}</p>
+          <p>
+            <strong className="text-slate-950">商品价格：</strong>
+            {formatProductPrice(report.input)}
+            {isPriceUncertain(report.input) ? (
+              <span className="ml-2 text-xs text-amber-700">价格识别不确定，建议人工核对。</span>
+            ) : null}
+          </p>
           <p><strong className="text-slate-950">周销量：</strong>{formatOptionalNumber(report.input.weeklySales)}</p>
           <p><strong className="text-slate-950">月销量：</strong>{formatOptionalNumber(report.input.monthlySales)}</p>
           <p><strong className="text-slate-950">商品评分：</strong>{formatOptionalNumber(report.input.rating)}</p>

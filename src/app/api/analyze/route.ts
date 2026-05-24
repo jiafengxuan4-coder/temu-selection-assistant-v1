@@ -60,6 +60,10 @@ function parseProduct(value: Record<string, unknown>): ProductInput | null {
     price,
     priceDisplay: parseOptionalString(value.priceDisplay),
     priceCurrency: parseOptionalString(value.priceCurrency),
+    priceSource: parseOptionalString(value.priceSource) as ProductInput["priceSource"],
+    priceCandidates: Array.isArray(value.priceCandidates)
+      ? value.priceCandidates as ProductInput["priceCandidates"]
+      : undefined,
     weeklySales: parseOptionalNumber(value.weeklySales),
     monthlySales: parseOptionalNumber(value.monthlySales),
     rating: parseOptionalNumber(value.rating),
@@ -86,6 +90,8 @@ function mergeRecognizedProduct(
       || (hasManualPrice(rawProduct.price) ? undefined : recognizedProduct?.priceDisplay),
     priceCurrency: parseOptionalString(rawProduct.priceCurrency)
       || (hasManualPrice(rawProduct.price) ? undefined : recognizedProduct?.priceCurrency),
+    priceSource: hasManualPrice(rawProduct.price) ? undefined : recognizedProduct?.priceSource,
+    priceCandidates: recognizedProduct?.priceCandidates,
     weeklySales: parseOptionalNumber(rawProduct.weeklySales) ?? recognizedProduct?.weeklySales,
     monthlySales: parseOptionalNumber(rawProduct.monthlySales) ?? recognizedProduct?.monthlySales,
     rating: parseOptionalNumber(rawProduct.rating) ?? recognizedProduct?.rating,
@@ -126,6 +132,8 @@ function toRecognizedFieldsSummary(
     price: recognizedProduct.price,
     priceDisplay: recognizedProduct.priceDisplay,
     priceCurrency: recognizedProduct.priceCurrency,
+    priceSource: recognizedProduct.priceSource,
+    priceCandidates: recognizedProduct.priceCandidates,
     weeklySales: recognizedProduct.weeklySales,
     monthlySales: recognizedProduct.monthlySales,
     rating: recognizedProduct.rating,
@@ -183,6 +191,8 @@ export async function POST(request: NextRequest) {
       price: product.price,
       priceDisplay: product.priceDisplay,
       priceCurrency: product.priceCurrency,
+      priceSource: product.priceSource,
+      priceCandidates: product.priceCandidates,
       weeklySales: product.weeklySales,
       monthlySales: product.monthlySales,
       rating: product.rating,

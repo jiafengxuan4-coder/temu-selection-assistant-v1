@@ -1,6 +1,11 @@
 ﻿import { getAIProvider, getAIProviderConfig } from "@/lib/ai/providers";
 import type { AIChatMessage } from "@/lib/ai/providers";
-import type { ProductImageInput, RecognizedProductFields } from "@/types/product";
+import type {
+  ProductImageInput,
+  ProductPriceCandidate,
+  ProductPriceSource,
+  RecognizedProductFields
+} from "@/types/product";
 
 type RecognizeProductFromImageInput = {
   imageBase64: string;
@@ -116,24 +121,100 @@ function getCurrencyPrefix(currency: string | undefined): string | undefined {
   }
 }
 
+function normalizePriceSource(value: unknown): ProductPriceCandidate["source"] | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const normalized = value.trim();
+  const allowedSources = new Set([
+    "current_sale_price",
+    "discount_price",
+    "original_price",
+    "coupon_price",
+    "other",
+    "uncertain"
+  ]);
+
+  return allowedSources.has(normalized) ? normalized as ProductPriceCandidate["source"] : undefined;
+}
+
+function normalizeMainPriceSource(value: unknown): ProductPriceSource | undefined {
+  const source = normalizePriceSource(value);
+  return source && source !== "other" ? source : undefined;
+}
+
+function parsePriceCandidates(value: unknown): ProductPriceCandidate[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
+    .map((item) => {
+      const display = pickString(item.display);
+      const parsedValue = parsePrice(item.value) ?? parsePrice(display);
+
+      if (typeof parsedValue !== "number") {
+        return null;
+      }
+
+      const currency = normalizeCurrency(item.currency) ?? inferCurrencyFromText(display);
+      const prefix = getCurrencyPrefix(currency);
+
+      return {
+        value: parsedValue,
+        display: display ?? `${prefix ?? ""}${parsedValue}`,
+        currency,
+        source: normalizePriceSource(item.source),
+        reason: pickString(item.reason)
+      };
+    })
+    .filter((item): item is ProductPriceCandidate => item !== null);
+}
+
+function choosePrimaryPriceCandidate(candidates: ProductPriceCandidate[]): ProductPriceCandidate | undefined {
+  const priority: Array<ProductPriceCandidate["source"]> = [
+    "current_sale_price",
+    "discount_price",
+    "coupon_price",
+    "uncertain",
+    "other",
+    "original_price"
+  ];
+
+  return priority
+    .map((source) => candidates.find((candidate) => candidate.source === source))
+    .find((candidate): candidate is ProductPriceCandidate => Boolean(candidate))
+    ?? candidates[0];
+}
+
 function parsePriceInfo(
   priceValue: unknown,
   priceDisplayValue: unknown,
-  priceCurrencyValue: unknown
-): Pick<RecognizedProductFields, "price" | "priceDisplay" | "priceCurrency"> {
+  priceCurrencyValue: unknown,
+  priceSourceValue: unknown,
+  priceCandidatesValue: unknown
+): Pick<RecognizedProductFields, "price" | "priceDisplay" | "priceCurrency" | "priceSource" | "priceCandidates"> {
+  const priceCandidates = parsePriceCandidates(priceCandidatesValue);
+  const primaryCandidate = choosePrimaryPriceCandidate(priceCandidates);
   const priceDisplay = pickString(priceDisplayValue);
-  const priceSource = priceDisplay ?? (typeof priceValue === "string" ? priceValue.trim() : undefined);
-  const price = parsePrice(priceValue) ?? parsePrice(priceDisplay);
+  const priceSourceText = priceDisplay ?? (typeof priceValue === "string" ? priceValue.trim() : undefined);
+  const price = primaryCandidate?.value ?? parsePrice(priceValue) ?? parsePrice(priceDisplay);
   const priceCurrency = normalizeCurrency(priceCurrencyValue)
-    ?? inferCurrencyFromText(priceSource)
+    ?? primaryCandidate?.currency
+    ?? inferCurrencyFromText(priceSourceText)
     ?? (typeof price === "number" ? "UNKNOWN" : undefined);
   const prefix = getCurrencyPrefix(priceCurrency);
   const generatedDisplay = typeof price === "number" ? `${prefix ?? ""}${price}` : undefined;
+  const priceSource = normalizeMainPriceSource(primaryCandidate?.source) ?? normalizeMainPriceSource(priceSourceValue);
 
   return {
     price,
-    priceDisplay: priceDisplay ?? priceSource ?? generatedDisplay,
-    priceCurrency
+    priceDisplay: primaryCandidate?.display ?? priceDisplay ?? priceSourceText ?? generatedDisplay,
+    priceCurrency,
+    priceSource,
+    priceCandidates
   };
 }
 
@@ -220,6 +301,21 @@ function createWarnings(result: RecognizedProductFields, rawWarnings: string[]):
     warnings.push("截图可能不完整，建议上传包含标题、价格、销量和评分的完整商品截图");
   }
 
+  if (result.priceCandidates && result.priceCandidates.length > 1) {
+    warnings.push("截图中存在多个价格，系统已优先选择当前售价，建议人工核对。");
+  }
+
+  if (
+    result.priceSource === "original_price"
+    || (result.priceCandidates?.length === 1 && result.priceCandidates[0]?.source === "original_price")
+  ) {
+    warnings.push("仅识别到原价或划线价，建议人工核对当前售价。");
+  }
+
+  if (result.priceSource === "uncertain") {
+    warnings.push("截图中存在多个价格，建议人工核对。");
+  }
+
   return [...new Set(warnings)];
 }
 
@@ -247,13 +343,21 @@ function calculateConfidence(result: RecognizedProductFields): RecognizedProduct
 
 function parseRecognizedFields(rawText: string, imageCount: number): RecognizedProductFields {
   const parsed = JSON.parse(cleanJsonText(rawText)) as Record<string, unknown>;
-  const priceInfo = parsePriceInfo(parsed.price, parsed.priceDisplay, parsed.priceCurrency);
+  const priceInfo = parsePriceInfo(
+    parsed.price,
+    parsed.priceDisplay,
+    parsed.priceCurrency,
+    parsed.priceSource,
+    parsed.priceCandidates
+  );
   const result: RecognizedProductFields = {
     title: pickString(parsed.title),
     category: pickString(parsed.category),
     price: priceInfo.price,
     priceDisplay: priceInfo.priceDisplay,
     priceCurrency: priceInfo.priceCurrency,
+    priceSource: priceInfo.priceSource,
+    priceCandidates: priceInfo.priceCandidates,
     weeklySales: parseSalesCount(parsed.weeklySales),
     monthlySales: parseSalesCount(parsed.monthlySales),
     rating: parseRating(parsed.rating),
@@ -290,6 +394,8 @@ function buildRecognitionPrompt(imageCount: number): string {
   "price": null,
   "priceDisplay": null,
   "priceCurrency": null,
+  "priceSource": null,
+  "priceCandidates": [],
   "weeklySales": null,
   "monthlySales": null,
   "rating": null,
@@ -307,19 +413,27 @@ function buildRecognitionPrompt(imageCount: number): string {
 3. price 只提取商品售价，返回数字。
 4. priceDisplay 必须保留截图中的原始价格和币种符号，例如 €9.79、$9.79、US$9.79、￥69、£8.99、CA$12.99、AU$15.99。
 5. priceCurrency 返回 USD / EUR / CNY / GBP / CAD / AUD / JPY / KRW / UNKNOWN / null。
-6. weeklySales 和 monthlySales 要区分周期。
-7. 如果截图只出现 sold / 已售 / 销量，但无法判断是周销量还是月销量，优先放入 monthlySales，并在 rawText 说明周期不确定。
-8. rating 返回 0-5 的数字。
-9. reviewCount 返回评论数量，如果看不到则为 null。
-10. reviewsText 通常为空，除非截图中真的有评论内容。
-11. category 如果截图没有明确类目，可以根据商品外观粗略判断，但 confidence 不得为 high。
-12. missingFields 写出没识别到的字段。
-13. 识别不到的字段必须返回 null，不要猜销量、评分、评论。
-14. 如果图片模糊、裁剪严重、关键信息缺失，请在 warnings 中用中文说明。
-15. 多张截图来自同一个商品，请综合识别，不要逐张重复输出。
-16. 如果不同截图字段冲突，以更清晰、更完整、更像商品详情页主信息的字段为准。
-17. 如果多张截图信息可能不一致，在 warnings 中加入“多张截图信息可能存在不一致，建议人工核对”。
-18. 如果某张图无法识别，不影响其他图片的信息提取。`;
+6. priceSource 返回 current_sale_price / discount_price / original_price / coupon_price / uncertain / null。
+7. priceCandidates 返回识别到的所有价格候选，每个候选包含 value、display、currency、source、reason。
+8. 如果截图中出现“最后1天”“限时”“sale”“deal”“discount”“优惠”“到手价”“券后价”等附近的价格，应优先作为当前售价。
+9. 如果价格被划线、灰色、旁边有“原价”“list price”“was”“before”等，不要作为主 price，只能作为 original_price candidate。
+10. 如果有多个价格，主 price 必须选择最像当前成交价的价格。
+11. 不要把销量、评分、评论数、店铺数据、利润、库存、折扣百分比当作商品价格。
+12. 如果无法确定哪个是当前售价，priceSource 返回 uncertain，并在 warnings 中提示“截图中存在多个价格，建议人工核对”。
+13. 如果截图中清晰显示“最后1天 $2.97”，应返回 price: 2.97、priceDisplay: "$2.97"、priceCurrency: "USD"、priceSource: "current_sale_price"。
+14. weeklySales 和 monthlySales 要区分周期。
+15. 如果截图只出现 sold / 已售 / 销量，但无法判断是周销量还是月销量，优先放入 monthlySales，并在 rawText 说明周期不确定。
+16. rating 返回 0-5 的数字。
+17. reviewCount 返回评论数量，如果看不到则为 null。
+18. reviewsText 通常为空，除非截图中真的有评论内容。
+19. category 如果截图没有明确类目，可以根据商品外观粗略判断，但 confidence 不得为 high。
+20. missingFields 写出没识别到的字段。
+21. 识别不到的字段必须返回 null，不要猜销量、评分、评论。
+22. 如果图片模糊、裁剪严重、关键信息缺失，请在 warnings 中用中文说明。
+23. 多张截图来自同一个商品，请综合识别，不要逐张重复输出。
+24. 如果不同截图字段冲突，以更清晰、更完整、更像商品详情页主信息的字段为准。
+25. 如果多张截图信息可能不一致，在 warnings 中加入“多张截图信息可能存在不一致，建议人工核对”。
+26. 如果某张图无法识别，不影响其他图片的信息提取。`;
 }
 
 export async function recognizeProductFromImage({
