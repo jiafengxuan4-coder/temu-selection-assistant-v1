@@ -10,6 +10,7 @@ import type { AnalysisReport } from "@/types/recommendation";
 
 type AnalysisReportViewProps = {
   report: AnalysisReport;
+  onReanalyze?: () => void;
 };
 
 const factorLabelMap: Record<HotProductFactorType, string> = {
@@ -51,7 +52,7 @@ function getReadableWarning(warning: string): string {
   return warning;
 }
 
-export function AnalysisReportView({ report }: AnalysisReportViewProps) {
+export function AnalysisReportView({ report, onReanalyze }: AnalysisReportViewProps) {
   const hasNoSales = !report.dataCompleteness.hasWeeklySales && !report.dataCompleteness.hasMonthlySales;
   const isHighRisk = report.directCopyRisk.riskLevel === "high";
 
@@ -66,6 +67,15 @@ export function AnalysisReportView({ report }: AnalysisReportViewProps) {
           <div className="flex flex-col gap-2 sm:flex-row">
             <CopyReportButton report={report} />
             <ExportMarkdownButton report={report} />
+            {onReanalyze ? (
+              <button
+                type="button"
+                onClick={onReanalyze}
+                className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+              >
+                重新分析
+              </button>
+            ) : null}
           </div>
         </div>
         <div className="mt-4 grid gap-3 text-sm leading-6 text-slate-700 sm:grid-cols-2">

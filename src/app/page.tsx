@@ -9,9 +9,22 @@ import type { AnalysisReport } from "@/types/recommendation";
 
 export default function Home() {
   const [report, setReport] = useState<AnalysisReport | null>(null);
+  const [currentProduct, setCurrentProduct] = useState<ProductInput | null>(null);
 
   function handleSubmit(product: ProductInput) {
+    setCurrentProduct(product);
     setReport(generateMockAnalysisReport(product));
+  }
+
+  function handleClear() {
+    setCurrentProduct(null);
+    setReport(null);
+  }
+
+  function handleReanalyze() {
+    if (currentProduct) {
+      setReport(generateMockAnalysisReport(currentProduct));
+    }
   }
 
   return (
@@ -33,10 +46,14 @@ export default function Home() {
         </header>
 
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,420px)_1fr]">
-          <ProductInputForm onSubmit={handleSubmit} />
+          <ProductInputForm
+            onSubmit={handleSubmit}
+            onClear={handleClear}
+            onDraftChange={setCurrentProduct}
+          />
           <section className="min-w-0">
             {report ? (
-              <AnalysisReportView report={report} />
+              <AnalysisReportView report={report} onReanalyze={handleReanalyze} />
             ) : (
               <div className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-sm leading-6 text-slate-600">
                 填写商品标题、类目和价格后，点击生成选品报告。图片识别将在下一版接入，本版本先使用模拟图片识别结果。

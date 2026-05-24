@@ -6,6 +6,8 @@ import type { ProductInput } from "@/types/product";
 
 type ProductInputFormProps = {
   onSubmit: (product: ProductInput) => void;
+  onClear?: () => void;
+  onDraftChange?: (product: ProductInput | null) => void;
 };
 
 type FormState = {
@@ -28,6 +30,17 @@ const initialFormState: FormState = {
   reviewsText: ""
 };
 
+const petLeashExample: FormState = {
+  title: "Reflective dog leash",
+  category: "宠物用品",
+  price: "9.99",
+  weeklySales: "300",
+  monthlySales: "1200",
+  rating: "4.6",
+  reviewsText:
+    "The leash is strong and useful for walking dogs at night. Some buyers want a harness and poop bag holder included."
+};
+
 function toOptionalNumber(value: string): number | undefined {
   if (!value.trim()) {
     return undefined;
@@ -37,36 +50,64 @@ function toOptionalNumber(value: string): number | undefined {
   return Number.isFinite(parsedValue) ? parsedValue : undefined;
 }
 
-export function ProductInputForm({ onSubmit }: ProductInputFormProps) {
+function toProductInput(formState: FormState): ProductInput | null {
+  const title = formState.title.trim();
+  const category = formState.category.trim();
+  const price = Number(formState.price);
+
+  if (!title || !category || !Number.isFinite(price) || price <= 0) {
+    return null;
+  }
+
+  return {
+    title,
+    category,
+    price,
+    weeklySales: toOptionalNumber(formState.weeklySales),
+    monthlySales: toOptionalNumber(formState.monthlySales),
+    rating: toOptionalNumber(formState.rating),
+    reviewsText: formState.reviewsText.trim() || undefined
+  };
+}
+
+export function ProductInputForm({ onSubmit, onClear, onDraftChange }: ProductInputFormProps) {
   const [formState, setFormState] = useState<FormState>(initialFormState);
   const [error, setError] = useState<string>("");
 
   function updateField(field: keyof FormState, value: string) {
-    setFormState((current) => ({ ...current, [field]: value }));
+    setFormState((current) => {
+      const nextState = { ...current, [field]: value };
+      onDraftChange?.(toProductInput(nextState));
+      return nextState;
+    });
+  }
+
+  function fillExampleCase() {
+    setFormState(petLeashExample);
+    setError("");
+    onDraftChange?.(toProductInput(petLeashExample));
+  }
+
+  function clearForm() {
+    setFormState(initialFormState);
+    setError("");
+    onDraftChange?.(null);
+    onClear?.();
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const title = formState.title.trim();
-    const category = formState.category.trim();
-    const price = Number(formState.price);
+    const product = toProductInput(formState);
 
-    if (!title || !category || !Number.isFinite(price) || price <= 0) {
+    if (!product) {
       setError("请填写商品标题、商品类目，并确保商品价格大于 0。");
       return;
     }
 
     setError("");
-    onSubmit({
-      title,
-      category,
-      price,
-      weeklySales: toOptionalNumber(formState.weeklySales),
-      monthlySales: toOptionalNumber(formState.monthlySales),
-      rating: toOptionalNumber(formState.rating),
-      reviewsText: formState.reviewsText.trim() || undefined
-    });
+    onDraftChange?.(product);
+    onSubmit(product);
   }
 
   return (
@@ -76,6 +117,26 @@ export function ProductInputForm({ onSubmit }: ProductInputFormProps) {
         <p className="text-sm leading-6 text-slate-500">
           图片识别将在下一版接入，本版本先使用模拟图片识别结果。
         </p>
+      </div>
+
+      <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3">
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <button
+            type="button"
+            onClick={fillExampleCase}
+            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-100"
+          >
+            填充宠物牵引绳案例
+          </button>
+          <button
+            type="button"
+            onClick={clearForm}
+            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+          >
+            清空表单
+          </button>
+        </div>
+        <p className="mt-2 text-xs leading-5 text-slate-500">用于快速演示报告效果。</p>
       </div>
 
       <div className="mt-5 space-y-4">
