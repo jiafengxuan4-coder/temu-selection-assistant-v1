@@ -1,6 +1,6 @@
 import { generateMockAnalysisReport } from "@/lib/mockAnalysis";
 import type { AnalyzeProductResponse } from "@/types/ai";
-import type { ProductInput } from "@/types/product";
+import type { ProductInput, RecognizedProductFields } from "@/types/product";
 import type { AnalysisReport } from "@/types/recommendation";
 
 export type ClientAnalysisSource = "api" | "mock_fallback";
@@ -9,6 +9,7 @@ export type ClientAnalysisResult = {
   report: AnalysisReport | null;
   source: ClientAnalysisSource;
   message?: string;
+  recognizedFields?: RecognizedProductFields;
 };
 
 function fallbackToMock(product: ProductInput, message: string): ClientAnalysisResult {
@@ -43,7 +44,8 @@ export async function analyzeProductFromClient(
       return {
         report: result.data,
         source: result.source,
-        message: result.message ?? "已通过后端分析接口生成报告。"
+        message: result.message ?? "已通过后端分析接口生成报告。",
+        recognizedFields: result.recognizedFields
       };
     }
 
@@ -51,7 +53,8 @@ export async function analyzeProductFromClient(
       return {
         report: null,
         source: "mock_fallback",
-        message: result.error || "截图识别不完整，请手动补充商品标题、类目和价格。"
+        message: result.error || "截图识别不完整，请手动补充商品标题、类目和价格。",
+        recognizedFields: result.recognizedFields
       };
     }
 

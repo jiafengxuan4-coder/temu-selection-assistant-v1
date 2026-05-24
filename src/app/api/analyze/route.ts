@@ -70,6 +70,39 @@ function jsonResponse(body: AnalyzeProductResponse, status: number) {
   return NextResponse.json(body, { status });
 }
 
+function toRecognizedFieldsSummary(
+  recognizedProduct: RecognizedProductFields | null
+): RecognizedProductFields | undefined {
+  if (!recognizedProduct) {
+    return undefined;
+  }
+
+  const missingFields = recognizedProduct.missingFields ?? [];
+  const warnings = [...(recognizedProduct.warnings ?? [])];
+
+  if (recognizedProduct.confidence === "low") {
+    warnings.push("截图识别置信度较低，建议人工核对。");
+  }
+
+  if (missingFields.length > 0) {
+    warnings.push(`未识别字段：${missingFields.join("、")}`);
+  }
+
+  return {
+    title: recognizedProduct.title,
+    category: recognizedProduct.category,
+    price: recognizedProduct.price,
+    weeklySales: recognizedProduct.weeklySales,
+    monthlySales: recognizedProduct.monthlySales,
+    rating: recognizedProduct.rating,
+    reviewCount: recognizedProduct.reviewCount,
+    reviewsText: recognizedProduct.reviewsText,
+    confidence: recognizedProduct.confidence ?? "unknown",
+    missingFields,
+    warnings
+  };
+}
+
 export async function POST(request: NextRequest) {
   let body: AnalyzeProductRequest | null = null;
 
@@ -101,7 +134,7 @@ export async function POST(request: NextRequest) {
       ? "截图识别未能完整获取商品标题、类目或价格，请手动补充后再生成报告。"
       : "请求体缺少 title、category 或有效 price，且 price 必须大于 0。";
 
-    return jsonResponse({ ok: false, error }, 400);
+    return jsonResponse({ ok: false, error, recognizedFields: toRecognizedFieldsSummary(recognizedProduct) }, 400);
   }
 
   try {
@@ -127,7 +160,7 @@ export async function POST(request: NextRequest) {
         data: result.report,
         source: result.source,
         message,
-        recognizedProduct: recognizedProduct ?? undefined
+        recognizedFields: toRecognizedFieldsSummary(recognizedProduct)
       },
       200
     );

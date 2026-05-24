@@ -21,8 +21,9 @@ export type RecognizedProductFields = {
   rating?: number;
   reviewCount?: number;
   reviewsText?: string;
-  confidence?: "low" | "medium" | "high";
+  confidence?: "low" | "medium" | "high" | "unknown";
   missingFields?: string[];
+  warnings?: string[];
   rawText?: string;
 };
 

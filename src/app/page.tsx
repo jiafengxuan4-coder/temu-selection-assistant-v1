@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { AnalysisReportView } from "@/components/AnalysisReportView";
 import { ProductInputForm } from "@/components/ProductInputForm";
+import { RecognizedFieldsPanel } from "@/components/RecognizedFieldsPanel";
 import { analyzeProductFromClient } from "@/lib/clientAnalyze";
 import type { ClientAnalysisSource } from "@/lib/clientAnalyze";
-import type { ProductInput } from "@/types/product";
+import type { ProductInput, RecognizedProductFields } from "@/types/product";
 import type { AnalysisReport } from "@/types/recommendation";
 
 export default function Home() {
@@ -14,6 +15,7 @@ export default function Home() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisSource, setAnalysisSource] = useState<ClientAnalysisSource | undefined>();
   const [analysisMessage, setAnalysisMessage] = useState<string | undefined>();
+  const [recognizedFields, setRecognizedFields] = useState<RecognizedProductFields | undefined>();
 
   async function runAnalysis(product: ProductInput) {
     setIsAnalyzing(true);
@@ -24,6 +26,7 @@ export default function Home() {
       setReport(result.report);
       setAnalysisSource(result.source);
       setAnalysisMessage(result.message);
+      setRecognizedFields(result.recognizedFields);
     } finally {
       setIsAnalyzing(false);
     }
@@ -39,6 +42,7 @@ export default function Home() {
     setReport(null);
     setAnalysisSource(undefined);
     setAnalysisMessage(undefined);
+    setRecognizedFields(undefined);
     setIsAnalyzing(false);
   }
 
@@ -74,21 +78,24 @@ export default function Home() {
             isSubmitting={isAnalyzing}
           />
           <section className="min-w-0">
-            {report ? (
-              <AnalysisReportView
-                report={report}
-                onReanalyze={handleReanalyze}
-                analysisSource={analysisSource}
-                analysisMessage={analysisMessage}
-                isAnalyzing={isAnalyzing}
-              />
-            ) : (
-              <div className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-sm leading-6 text-slate-600">
-                {analysisMessage
-                  ? analysisMessage
-                  : "填写商品标题、类目和价格，或上传商品截图后点击生成选品报告。识别不完整时请手动补充关键字段。"}
-              </div>
-            )}
+            <div className="space-y-5">
+              <RecognizedFieldsPanel recognizedFields={recognizedFields} manualProduct={currentProduct} />
+              {report ? (
+                <AnalysisReportView
+                  report={report}
+                  onReanalyze={handleReanalyze}
+                  analysisSource={analysisSource}
+                  analysisMessage={analysisMessage}
+                  isAnalyzing={isAnalyzing}
+                />
+              ) : (
+                <div className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-sm leading-6 text-slate-600">
+                  {analysisMessage
+                    ? analysisMessage
+                    : "填写商品标题、类目和价格，或上传商品截图后点击生成选品报告。识别不完整时请手动补充关键字段。"}
+                </div>
+              )}
+            </div>
           </section>
         </div>
       </div>

@@ -24,12 +24,13 @@ export type AnalyzeProductSuccessResponse = {
   data: AnalysisReport;
   source: "api" | "mock_fallback";
   message?: string;
-  recognizedProduct?: RecognizedProductFields;
+  recognizedFields?: RecognizedProductFields;
 };
 
 export type AnalyzeProductErrorResponse = {
   ok: false;
   error: string;
+  recognizedFields?: RecognizedProductFields;
 };
 
 export type AnalyzeProductResponse =
