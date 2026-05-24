@@ -30,6 +30,25 @@ npm.cmd run dev
 http://localhost:3000
 ```
 
+## 本地环境变量配置
+
+1. 复制 `.env.example` 为 `.env.local`
+2. 配置 `AI_PROVIDER`、`AI_API_KEY`、`AI_BASE_URL`、`AI_MODEL`
+3. 重启 `npm.cmd run dev`
+
+支持的 AI Provider：
+
+- `openai`
+- `qwen`
+- `doubao`
+- `deepseek`
+
+国内环境建议优先使用 `qwen` 或 `doubao`。DeepSeek 更适合文本推理，不优先用于图片识别。模型名和接口地址请以各平台控制台实际可用配置为准。
+
+当前版本仍未接入真实图片上传。如 AI 调用失败，系统会自动使用 Mock 兜底分析。
+
+不要把 `.env.local` 提交到 Git。
+
 ## 当前开发状态
 
 当前完成 Task 001：初始化项目和业务文档落地。

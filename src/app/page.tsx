@@ -3,27 +3,48 @@
 import { useState } from "react";
 import { AnalysisReportView } from "@/components/AnalysisReportView";
 import { ProductInputForm } from "@/components/ProductInputForm";
-import { generateMockAnalysisReport } from "@/lib/mockAnalysis";
+import { analyzeProductFromClient } from "@/lib/clientAnalyze";
+import type { ClientAnalysisSource } from "@/lib/clientAnalyze";
 import type { ProductInput } from "@/types/product";
 import type { AnalysisReport } from "@/types/recommendation";
 
 export default function Home() {
   const [report, setReport] = useState<AnalysisReport | null>(null);
   const [currentProduct, setCurrentProduct] = useState<ProductInput | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisSource, setAnalysisSource] = useState<ClientAnalysisSource | undefined>();
+  const [analysisMessage, setAnalysisMessage] = useState<string | undefined>();
+
+  async function runAnalysis(product: ProductInput) {
+    setIsAnalyzing(true);
+    setAnalysisMessage(undefined);
+
+    try {
+      const result = await analyzeProductFromClient(product);
+      setReport(result.report);
+      setAnalysisSource(result.source);
+      setAnalysisMessage(result.message);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }
 
   function handleSubmit(product: ProductInput) {
     setCurrentProduct(product);
-    setReport(generateMockAnalysisReport(product));
+    void runAnalysis(product);
   }
 
   function handleClear() {
     setCurrentProduct(null);
     setReport(null);
+    setAnalysisSource(undefined);
+    setAnalysisMessage(undefined);
+    setIsAnalyzing(false);
   }
 
   function handleReanalyze() {
     if (currentProduct) {
-      setReport(generateMockAnalysisReport(currentProduct));
+      void runAnalysis(currentProduct);
     }
   }
 
@@ -50,10 +71,17 @@ export default function Home() {
             onSubmit={handleSubmit}
             onClear={handleClear}
             onDraftChange={setCurrentProduct}
+            isSubmitting={isAnalyzing}
           />
           <section className="min-w-0">
             {report ? (
-              <AnalysisReportView report={report} onReanalyze={handleReanalyze} />
+              <AnalysisReportView
+                report={report}
+                onReanalyze={handleReanalyze}
+                analysisSource={analysisSource}
+                analysisMessage={analysisMessage}
+                isAnalyzing={isAnalyzing}
+              />
             ) : (
               <div className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-sm leading-6 text-slate-600">
                 填写商品标题、类目和价格后，点击生成选品报告。图片识别将在下一版接入，本版本先使用模拟图片识别结果。

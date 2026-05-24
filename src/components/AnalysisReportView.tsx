@@ -1,6 +1,7 @@
 import { CopyReportButton } from "@/components/CopyReportButton";
 import { ExportMarkdownButton } from "@/components/ExportMarkdownButton";
 import { RecommendationCard } from "@/components/RecommendationCard";
+import type { ClientAnalysisSource } from "@/lib/clientAnalyze";
 import type {
   ConfidenceLevel,
   HotProductFactorType,
@@ -11,6 +12,9 @@ import type { AnalysisReport } from "@/types/recommendation";
 type AnalysisReportViewProps = {
   report: AnalysisReport;
   onReanalyze?: () => void;
+  analysisSource?: ClientAnalysisSource;
+  analysisMessage?: string;
+  isAnalyzing?: boolean;
 };
 
 const factorLabelMap: Record<HotProductFactorType, string> = {
@@ -52,7 +56,13 @@ function getReadableWarning(warning: string): string {
   return warning;
 }
 
-export function AnalysisReportView({ report, onReanalyze }: AnalysisReportViewProps) {
+export function AnalysisReportView({
+  report,
+  onReanalyze,
+  analysisSource,
+  analysisMessage,
+  isAnalyzing = false
+}: AnalysisReportViewProps) {
   const hasNoSales = !report.dataCompleteness.hasWeeklySales && !report.dataCompleteness.hasMonthlySales;
   const isHighRisk = report.directCopyRisk.riskLevel === "high";
 
@@ -63,6 +73,19 @@ export function AnalysisReportView({ report, onReanalyze }: AnalysisReportViewPr
           <div>
             <h2 className="text-xl font-semibold text-slate-950">结构化选品报告</h2>
             <p className="mt-1 text-sm text-slate-500">可复制为中文纯文本，方便发给学员、运营同事或客户。</p>
+            {analysisSource ? (
+              <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm leading-6 text-slate-700">
+                <p>
+                  <strong className="text-slate-950">当前使用：</strong>
+                  {analysisSource === "api" ? "AI API 分析" : "Mock 兜底分析"}
+                </p>
+                {analysisMessage ? (
+                  <p className="mt-1 text-slate-500">
+                    {analysisSource === "mock_fallback" ? `原因：${analysisMessage}` : analysisMessage}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
             <CopyReportButton report={report} />
@@ -71,9 +94,10 @@ export function AnalysisReportView({ report, onReanalyze }: AnalysisReportViewPr
               <button
                 type="button"
                 onClick={onReanalyze}
-                className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+                disabled={isAnalyzing}
+                className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
               >
-                重新分析
+                {isAnalyzing ? "正在生成报告..." : "重新分析"}
               </button>
             ) : null}
           </div>

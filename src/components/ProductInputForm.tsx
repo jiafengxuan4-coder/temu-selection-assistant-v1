@@ -8,6 +8,7 @@ type ProductInputFormProps = {
   onSubmit: (product: ProductInput) => void;
   onClear?: () => void;
   onDraftChange?: (product: ProductInput | null) => void;
+  isSubmitting?: boolean;
 };
 
 type FormState = {
@@ -70,7 +71,12 @@ function toProductInput(formState: FormState): ProductInput | null {
   };
 }
 
-export function ProductInputForm({ onSubmit, onClear, onDraftChange }: ProductInputFormProps) {
+export function ProductInputForm({
+  onSubmit,
+  onClear,
+  onDraftChange,
+  isSubmitting = false
+}: ProductInputFormProps) {
   const [formState, setFormState] = useState<FormState>(initialFormState);
   const [error, setError] = useState<string>("");
 
@@ -253,9 +259,10 @@ export function ProductInputForm({ onSubmit, onClear, onDraftChange }: ProductIn
 
       <button
         type="submit"
-        className="mt-5 w-full rounded-md bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
+        disabled={isSubmitting}
+        className="mt-5 w-full rounded-md bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
       >
-        生成差异化选品报告
+        {isSubmitting ? "正在生成报告..." : "生成差异化选品报告"}
       </button>
     </form>
   );
