@@ -7,9 +7,21 @@ export interface AIProviderConfig {
   model: string;
 }
 
+export type AITextContentPart = {
+  type: "text";
+  text: string;
+};
+
+export type AIImageContentPart = {
+  type: "image_url";
+  image_url: {
+    url: string;
+  };
+};
+
 export interface AIChatMessage {
   role: "system" | "user" | "assistant";
-  content: string;
+  content: string | Array<AITextContentPart | AIImageContentPart>;
 }
 
 export interface AIProviderResponse {

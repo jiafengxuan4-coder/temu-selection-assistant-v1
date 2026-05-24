@@ -22,7 +22,7 @@ export function ImageUploadPreview({
       <div className="space-y-1">
         <h3 className="text-sm font-semibold text-slate-900">上传商品截图</h3>
         <p className="text-xs leading-5 text-slate-500">
-          上传 TEMU 商品截图后，后续版本将自动识别商品标题、价格、销量、评分等信息；当前版本先支持图片预览。
+          上传 TEMU 商品截图后，系统会尝试识别商品标题、价格、销量、评分等信息；识别不完整时可手动补充。
         </p>
       </div>
 
@@ -67,7 +67,7 @@ export function ImageUploadPreview({
               移除图片
             </button>
             <p className="mt-2 text-xs leading-5 text-slate-500">
-              当前版本已接收截图预览，真实图片识别将在下一步接入。
+              已接收截图，生成报告时会先尝试识别截图中的商品信息。
             </p>
           </div>
         ) : null}

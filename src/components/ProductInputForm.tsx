@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { FormEvent } from "react";
 import { ImageUploadPreview } from "@/components/ImageUploadPreview";
 import type { ProductInput } from "@/types/product";
@@ -20,6 +20,12 @@ type FormState = {
   monthlySales: string;
   rating: string;
   reviewsText: string;
+};
+
+type ImageState = {
+  imageBase64?: string;
+  imageMimeType?: string;
+  imageFileName?: string;
 };
 
 const initialFormState: FormState = {
@@ -59,23 +65,31 @@ function formatFileSize(size: number): string {
   return `${(size / 1024 / 1024).toFixed(2)} MB`;
 }
 
-function toProductInput(formState: FormState): ProductInput | null {
+function toProductInput(
+  formState: FormState,
+  imageState?: ImageState,
+  allowIncomplete = false
+): ProductInput | null {
   const title = formState.title.trim();
   const category = formState.category.trim();
   const price = Number(formState.price);
+  const hasValidPrice = Number.isFinite(price) && price > 0;
 
-  if (!title || !category || !Number.isFinite(price) || price <= 0) {
+  if ((!title || !category || !hasValidPrice) && !allowIncomplete) {
     return null;
   }
 
   return {
     title,
     category,
-    price,
+    price: hasValidPrice ? price : 0,
     weeklySales: toOptionalNumber(formState.weeklySales),
     monthlySales: toOptionalNumber(formState.monthlySales),
     rating: toOptionalNumber(formState.rating),
-    reviewsText: formState.reviewsText.trim() || undefined
+    reviewsText: formState.reviewsText.trim() || undefined,
+    imageBase64: imageState?.imageBase64,
+    imageMimeType: imageState?.imageMimeType,
+    imageFileName: imageState?.imageFileName
   };
 }
 
@@ -90,20 +104,22 @@ export function ProductInputForm({
   const [imageFileName, setImageFileName] = useState<string>("");
   const [imageFileSize, setImageFileSize] = useState<number>(0);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string>("");
+  const [imageMimeType, setImageMimeType] = useState<string>("");
+  const [imageBase64, setImageBase64] = useState<string>("");
   const [imageError, setImageError] = useState<string>("");
 
-  useEffect(() => {
-    return () => {
-      if (imagePreviewUrl) {
-        URL.revokeObjectURL(imagePreviewUrl);
-      }
+  function getImageState(nextBase64 = imageBase64, nextMimeType = imageMimeType, nextFileName = imageFileName): ImageState {
+    return {
+      imageBase64: nextBase64 || undefined,
+      imageMimeType: nextMimeType || undefined,
+      imageFileName: nextFileName || undefined
     };
-  }, [imagePreviewUrl]);
+  }
 
   function updateField(field: keyof FormState, value: string) {
     setFormState((current) => {
       const nextState = { ...current, [field]: value };
-      onDraftChange?.(toProductInput(nextState));
+      onDraftChange?.(toProductInput(nextState, getImageState()));
       return nextState;
     });
   }
@@ -111,7 +127,7 @@ export function ProductInputForm({
   function fillExampleCase() {
     setFormState(petLeashExample);
     setError("");
-    onDraftChange?.(toProductInput(petLeashExample));
+    onDraftChange?.(toProductInput(petLeashExample, getImageState()));
   }
 
   function clearForm() {
@@ -123,14 +139,13 @@ export function ProductInputForm({
   }
 
   function clearImage() {
-    if (imagePreviewUrl) {
-      URL.revokeObjectURL(imagePreviewUrl);
-    }
-
     setImageFileName("");
     setImageFileSize(0);
     setImagePreviewUrl("");
+    setImageMimeType("");
+    setImageBase64("");
     setImageError("");
+    onDraftChange?.(toProductInput(formState));
   }
 
   function handleImageChange(file: File | null) {
@@ -152,22 +167,38 @@ export function ProductInputForm({
       return;
     }
 
-    if (imagePreviewUrl) {
-      URL.revokeObjectURL(imagePreviewUrl);
-    }
+    const reader = new FileReader();
 
-    setImageFileName(file.name);
-    setImageFileSize(file.size);
-    setImagePreviewUrl(URL.createObjectURL(file));
+    reader.onload = () => {
+      if (typeof reader.result !== "string") {
+        setImageError("图片读取失败，请重新选择截图。");
+        return;
+      }
+
+      setImageFileName(file.name);
+      setImageFileSize(file.size);
+      setImageMimeType(file.type);
+      setImageBase64(reader.result);
+      setImagePreviewUrl(reader.result);
+      onDraftChange?.(toProductInput(formState, getImageState(reader.result, file.type, file.name)));
+    };
+
+    reader.onerror = () => {
+      clearImage();
+      setImageError("图片读取失败，请重新选择截图。");
+    };
+
+    reader.readAsDataURL(file);
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const product = toProductInput(formState);
+    const hasImage = Boolean(imageBase64);
+    const product = toProductInput(formState, getImageState(), hasImage);
 
     if (!product) {
-      setError("请填写商品标题、商品类目，并确保商品价格大于 0。");
+      setError("请填写商品标题、商品类目，并确保商品价格大于 0；或先上传商品截图让系统尝试识别。");
       return;
     }
 
@@ -181,7 +212,7 @@ export function ProductInputForm({
       <div className="space-y-1">
         <h2 className="text-lg font-semibold text-slate-950">商品信息</h2>
         <p className="text-sm leading-6 text-slate-500">
-          图片识别将在下一版接入，本版本先使用模拟图片识别结果。
+          支持上传商品截图，系统会优先识别标题、价格、销量、评分等信息；识别不完整时可手动补充。
         </p>
       </div>
 

@@ -1,6 +1,8 @@
 export type ProductInput = {
   imageFileName?: string;
   imageUrl?: string;
+  imageBase64?: string;
+  imageMimeType?: string;
   title: string;
   category: string;
   price: number;
@@ -8,6 +10,20 @@ export type ProductInput = {
   monthlySales?: number;
   rating?: number;
   reviewsText?: string;
+};
+
+export type RecognizedProductFields = {
+  title?: string;
+  category?: string;
+  price?: number;
+  weeklySales?: number;
+  monthlySales?: number;
+  rating?: number;
+  reviewCount?: number;
+  reviewsText?: string;
+  confidence?: "low" | "medium" | "high";
+  missingFields?: string[];
+  rawText?: string;
 };
 
 export type ProductStructure = "single" | "bundle" | "multi_pack" | "unknown";

@@ -62,7 +62,7 @@ export default function Home() {
             </p>
           </div>
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
-            当前版本为 MVP 演示版：图片识别暂未接入真实 AI，本版本使用模拟图片识别结果。真实图片识别将在下一版本接入。
+            当前版本为 MVP 演示版：支持上传商品截图，系统会优先识别标题、价格、销量、评分等信息；识别不完整时可手动补充。
           </div>
         </header>
 
@@ -84,7 +84,9 @@ export default function Home() {
               />
             ) : (
               <div className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-sm leading-6 text-slate-600">
-                填写商品标题、类目和价格后，点击生成选品报告。图片识别将在下一版接入，本版本先使用模拟图片识别结果。
+                {analysisMessage
+                  ? analysisMessage
+                  : "填写商品标题、类目和价格，或上传商品截图后点击生成选品报告。识别不完整时请手动补充关键字段。"}
               </div>
             )}
           </section>

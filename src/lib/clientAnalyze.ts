@@ -6,7 +6,7 @@ import type { AnalysisReport } from "@/types/recommendation";
 export type ClientAnalysisSource = "api" | "mock_fallback";
 
 export type ClientAnalysisResult = {
-  report: AnalysisReport;
+  report: AnalysisReport | null;
   source: ClientAnalysisSource;
   message?: string;
 };
@@ -47,10 +47,15 @@ export async function analyzeProductFromClient(
       };
     }
 
-    return fallbackToMock(
-      product,
-      result.error || "API 暂不可用，已使用 Mock 兜底分析。"
-    );
+    if (product.imageBase64 && (!product.title || !product.category || product.price <= 0)) {
+      return {
+        report: null,
+        source: "mock_fallback",
+        message: result.error || "截图识别不完整，请手动补充商品标题、类目和价格。"
+      };
+    }
+
+    return fallbackToMock(product, result.error || "API 暂不可用，已使用 Mock 兜底分析。");
   } catch {
     return fallbackToMock(product, "分析接口暂不可用，已使用 Mock 兜底分析。");
   }

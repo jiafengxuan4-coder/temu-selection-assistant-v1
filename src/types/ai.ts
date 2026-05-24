@@ -1,6 +1,7 @@
 import type {
   ProductInput,
   ProductStructure,
+  RecognizedProductFields,
   StandardizationLevel
 } from "@/types/product";
 import type { AnalysisReport } from "@/types/recommendation";
@@ -23,6 +24,7 @@ export type AnalyzeProductSuccessResponse = {
   data: AnalysisReport;
   source: "api" | "mock_fallback";
   message?: string;
+  recognizedProduct?: RecognizedProductFields;
 };
 
 export type AnalyzeProductErrorResponse = {
