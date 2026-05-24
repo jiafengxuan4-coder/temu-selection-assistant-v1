@@ -73,6 +73,25 @@ AI_MODEL=qwen-plus
 
 ## 当前开发状态
 
-当前完成 Task 001：初始化项目和业务文档落地。
+当前处于 MVP 阶段，已具备基础演示和部署条件。
 
-已完成 docs 文档目录、MVP 范围文档、业务规则文档、Codex 任务清单、README，以及 `src/lib`、`src/types`、`src/components` 基础目录整理。
+已完成：
+
+- 规则版选品分析流程
+- AI 分析接口 `/api/analyze`
+- 多 AI Provider 配置：`openai`、`qwen`、`doubao`、`deepseek`
+- AI JSON 解析和中文报告后处理
+- Mock fallback：AI 配置缺失或调用失败时仍可生成报告
+- 复制报告
+- 导出 Markdown
+- 清空表单
+- 重新分析
+
+当前版本未接入：
+
+- 真实图片上传
+- 数据库
+- 登录
+- 支付
+- 自动上架
+- 自动推广
