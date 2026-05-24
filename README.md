@@ -34,7 +34,8 @@ http://localhost:3000
 
 1. 复制 `.env.example` 为 `.env.local`
 2. 配置 `AI_PROVIDER`、`AI_API_KEY`、`AI_BASE_URL`、`AI_MODEL`
-3. 重启 `npm.cmd run dev`
+3. 配置 `ALLOWED_PHONE_NUMBERS` 和 `ADMIN_WECHAT`
+4. 重启 `npm.cmd run dev`
 
 支持的 AI Provider：
 
@@ -47,6 +48,8 @@ http://localhost:3000
 
 当前版本仍未接入真实图片上传。如 AI 调用失败，系统会自动使用 Mock 兜底分析。
 
+当前 MVP 使用手机号白名单限制访问。`ALLOWED_PHONE_NUMBERS` 使用英文逗号分隔多个手机号，例如：`13800138000,13900139000`。
+
 不要把 `.env.local` 提交到 Git。
 
 ## 部署环境变量
@@ -58,6 +61,8 @@ AI_PROVIDER=qwen
 AI_API_KEY=your_api_key_here
 AI_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 AI_MODEL=qwen-plus
+ALLOWED_PHONE_NUMBERS=13800138000,13900139000
+ADMIN_WECHAT=your_wechat_id
 ```
 
 可选 provider：
@@ -68,6 +73,13 @@ AI_MODEL=qwen-plus
 - `deepseek`
 
 `OPENAI_API_KEY` 仅作为兼容旧配置使用。新配置优先使用 `AI_API_KEY`。
+
+手机号白名单访问限制需要在线上环境配置：
+
+- `ALLOWED_PHONE_NUMBERS`
+- `ADMIN_WECHAT`
+
+未配置 `ALLOWED_PHONE_NUMBERS` 时，本地开发环境会放行；生产环境会拒绝访问并提示联系管理员。
 
 `.env.local` 只用于本地开发，不应提交到 Git。线上环境变量应在部署平台后台配置，不要写入代码。
 
@@ -95,3 +107,4 @@ AI_MODEL=qwen-plus
 - 支付
 - 自动上架
 - 自动推广
+
