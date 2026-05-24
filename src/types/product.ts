@@ -1,14 +1,18 @@
-export type ProductImageInput = {
+﻿export type ProductImageInput = {
   imageBase64: string;
   imageMimeType: string;
   imageFileName: string;
 };
 
 export type ProductPriceSource =
-  | "current_sale_price"
-  | "discount_price"
-  | "original_price"
+  | "final_price"
+  | "estimated_price"
   | "coupon_price"
+  | "discount_price"
+  | "current_sale_price"
+  | "previous_price"
+  | "original_price"
+  | "strikethrough_price"
   | "uncertain";
 
 export type ProductPriceCandidate = {
@@ -78,3 +82,4 @@ export type DataCompleteness = {
   missingFields: string[];
   confidenceImpact: "low" | "medium" | "high";
 };
+

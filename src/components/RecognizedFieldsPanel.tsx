@@ -1,4 +1,4 @@
-import type { ProductInput, RecognizedProductFields } from "@/types/product";
+﻿import type { ProductInput, RecognizedProductFields } from "@/types/product";
 
 type RecognizedFieldsPanelProps = {
   recognizedFields?: RecognizedProductFields;
@@ -13,10 +13,14 @@ const confidenceLabelMap: Record<NonNullable<RecognizedProductFields["confidence
 };
 
 const priceSourceLabelMap: Record<string, string> = {
-  current_sale_price: "当前售价",
-  discount_price: "折扣价",
+  final_price: "到手价",
+  estimated_price: "预估价",
   coupon_price: "券后价",
+  discount_price: "折扣价",
+  current_sale_price: "当前售价",
+  previous_price: "前价",
   original_price: "原价",
+  strikethrough_price: "划线原价",
   other: "其他价格",
   uncertain: "不确定"
 };
@@ -153,3 +157,4 @@ export function RecognizedFieldsPanel({
     </section>
   );
 }
+

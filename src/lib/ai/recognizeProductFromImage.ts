@@ -128,10 +128,14 @@ function normalizePriceSource(value: unknown): ProductPriceCandidate["source"] |
 
   const normalized = value.trim();
   const allowedSources = new Set([
-    "current_sale_price",
-    "discount_price",
-    "original_price",
+    "final_price",
+    "estimated_price",
     "coupon_price",
+    "discount_price",
+    "current_sale_price",
+    "previous_price",
+    "original_price",
+    "strikethrough_price",
     "other",
     "uncertain"
   ]);
@@ -149,38 +153,60 @@ function parsePriceCandidates(value: unknown): ProductPriceCandidate[] {
     return [];
   }
 
-  return value
-    .filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
-    .map((item) => {
-      const display = pickString(item.display);
-      const parsedValue = parsePrice(item.value) ?? parsePrice(display);
+  const candidates: ProductPriceCandidate[] = [];
 
-      if (typeof parsedValue !== "number") {
-        return null;
-      }
+  for (const item of value) {
+    if (typeof item !== "object" || item === null) {
+      continue;
+    }
 
-      const currency = normalizeCurrency(item.currency) ?? inferCurrencyFromText(display);
-      const prefix = getCurrencyPrefix(currency);
+    const record = item as Record<string, unknown>;
+    const display = pickString(record.display);
+    const parsedValue = parsePrice(record.value) ?? parsePrice(display);
 
-      return {
-        value: parsedValue,
-        display: display ?? `${prefix ?? ""}${parsedValue}`,
-        currency,
-        source: normalizePriceSource(item.source),
-        reason: pickString(item.reason)
-      };
-    })
-    .filter((item): item is ProductPriceCandidate => item !== null);
+    if (typeof parsedValue !== "number") {
+      continue;
+    }
+
+    const currency = normalizeCurrency(record.currency) ?? inferCurrencyFromText(display);
+    const prefix = getCurrencyPrefix(currency);
+    const candidate: ProductPriceCandidate = {
+      value: parsedValue,
+      display: display ?? `${prefix ?? ""}${parsedValue}`
+    };
+    const source = normalizePriceSource(record.source);
+    const reason = pickString(record.reason);
+
+    if (currency) {
+      candidate.currency = currency;
+    }
+
+    if (source) {
+      candidate.source = source;
+    }
+
+    if (reason) {
+      candidate.reason = reason;
+    }
+
+    candidates.push(candidate);
+  }
+
+  return candidates;
 }
 
 function choosePrimaryPriceCandidate(candidates: ProductPriceCandidate[]): ProductPriceCandidate | undefined {
   const priority: Array<ProductPriceCandidate["source"]> = [
-    "current_sale_price",
-    "discount_price",
+    "final_price",
+    "estimated_price",
     "coupon_price",
+    "discount_price",
+    "current_sale_price",
+    "previous_price",
+    "original_price",
+    "strikethrough_price",
     "uncertain",
-    "other",
-    "original_price"
+    "other"
   ];
 
   return priority
@@ -302,18 +328,20 @@ function createWarnings(result: RecognizedProductFields, rawWarnings: string[]):
   }
 
   if (result.priceCandidates && result.priceCandidates.length > 1) {
-    warnings.push("截图中存在多个价格，系统已优先选择当前售价，建议人工核对。");
+    warnings.push("截图中存在多个价格，系统已优先采用预估价/到手价，建议人工核对。");
   }
 
   if (
     result.priceSource === "original_price"
-    || (result.priceCandidates?.length === 1 && result.priceCandidates[0]?.source === "original_price")
+    || result.priceSource === "strikethrough_price"
+    || (result.priceCandidates?.length === 1
+      && ["original_price", "strikethrough_price"].includes(result.priceCandidates[0]?.source ?? ""))
   ) {
-    warnings.push("仅识别到原价或划线价，建议人工核对当前售价。");
+    warnings.push("仅识别到原价或划线价，建议人工核对当前到手价。");
   }
 
   if (result.priceSource === "uncertain") {
-    warnings.push("截图中存在多个价格，建议人工核对。");
+    warnings.push("截图中存在多个价格，建议人工核对当前到手价。");
   }
 
   return [...new Set(warnings)];
@@ -413,14 +441,18 @@ function buildRecognitionPrompt(imageCount: number): string {
 3. price 只提取商品售价，返回数字。
 4. priceDisplay 必须保留截图中的原始价格和币种符号，例如 €9.79、$9.79、US$9.79、￥69、£8.99、CA$12.99、AU$15.99。
 5. priceCurrency 返回 USD / EUR / CNY / GBP / CAD / AUD / JPY / KRW / UNKNOWN / null。
-6. priceSource 返回 current_sale_price / discount_price / original_price / coupon_price / uncertain / null。
+6. priceSource 返回 final_price / estimated_price / coupon_price / discount_price / current_sale_price / previous_price / original_price / strikethrough_price / uncertain / null。
 7. priceCandidates 返回识别到的所有价格候选，每个候选包含 value、display、currency、source、reason。
-8. 如果截图中出现“最后1天”“限时”“sale”“deal”“discount”“优惠”“到手价”“券后价”等附近的价格，应优先作为当前售价。
-9. 如果价格被划线、灰色、旁边有“原价”“list price”“was”“before”等，不要作为主 price，只能作为 original_price candidate。
-10. 如果有多个价格，主 price 必须选择最像当前成交价的价格。
-11. 不要把销量、评分、评论数、店铺数据、利润、库存、折扣百分比当作商品价格。
-12. 如果无法确定哪个是当前售价，priceSource 返回 uncertain，并在 warnings 中提示“截图中存在多个价格，建议人工核对”。
-13. 如果截图中清晰显示“最后1天 $2.97”，应返回 price: 2.97、priceDisplay: "$2.97"、priceCurrency: "USD"、priceSource: "current_sale_price"。
+8. TEMU 页面中，如果价格前有“预估”“预计”“到手”“券后”“折后”“限时”“最后”“sale”“deal”等词，应优先作为主价格。
+9. 如果价格前有“预估”，这个价格通常是当前用户最应该参考的成交价，应优先于原价和前价，priceSource 使用 estimated_price。
+10. 如果价格被划线，或旁边显示“原价”“前价”“list price”“was”“before”等，不要作为主 price。
+11. 如果同时出现 $7.30、预估 $2.97、前价 $3.30，主价格必须选择 $2.97。
+12. $7.30 应作为 strikethrough_price 或 original_price candidate；$3.30 应作为 previous_price candidate。
+13. 不要把原价、前价、划线价错误标记为 current_sale_price。
+14. 如果截图中有橙色/红色的“预估价”，优先选择该价格。
+15. 不要把销量、评分、评论数、店铺数据、利润、库存、折扣百分比当作商品价格。
+16. 如果无法确定哪个是当前售价，priceSource 返回 uncertain，并在 warnings 中提示“截图中存在多个价格，建议人工核对当前到手价”。
+17. 如果截图中清晰显示“预估 $2.97”，应返回 price: 2.97、priceDisplay: "$2.97"、priceCurrency: "USD"、priceSource: "estimated_price"。
 14. weeklySales 和 monthlySales 要区分周期。
 15. 如果截图只出现 sold / 已售 / 销量，但无法判断是周销量还是月销量，优先放入 monthlySales，并在 rawText 说明周期不确定。
 16. rating 返回 0-5 的数字。
@@ -502,3 +534,5 @@ export async function recognizeProductFromImages(
     return fallbackRecognition(message, limitedImages.length);
   }
 }
+
+
