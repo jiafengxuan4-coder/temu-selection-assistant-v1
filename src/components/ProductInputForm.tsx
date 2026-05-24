@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import { ImageUploadPreview } from "@/components/ImageUploadPreview";
 import type { ProductInput } from "@/types/product";
 
 type ProductInputFormProps = {
@@ -42,6 +43,9 @@ const petLeashExample: FormState = {
     "The leash is strong and useful for walking dogs at night. Some buyers want a harness and poop bag holder included."
 };
 
+const allowedImageTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
+const maxImageSize = 5 * 1024 * 1024;
+
 function toOptionalNumber(value: string): number | undefined {
   if (!value.trim()) {
     return undefined;
@@ -49,6 +53,10 @@ function toOptionalNumber(value: string): number | undefined {
 
   const parsedValue = Number(value);
   return Number.isFinite(parsedValue) ? parsedValue : undefined;
+}
+
+function formatFileSize(size: number): string {
+  return `${(size / 1024 / 1024).toFixed(2)} MB`;
 }
 
 function toProductInput(formState: FormState): ProductInput | null {
@@ -79,6 +87,18 @@ export function ProductInputForm({
 }: ProductInputFormProps) {
   const [formState, setFormState] = useState<FormState>(initialFormState);
   const [error, setError] = useState<string>("");
+  const [imageFileName, setImageFileName] = useState<string>("");
+  const [imageFileSize, setImageFileSize] = useState<number>(0);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string>("");
+  const [imageError, setImageError] = useState<string>("");
+
+  useEffect(() => {
+    return () => {
+      if (imagePreviewUrl) {
+        URL.revokeObjectURL(imagePreviewUrl);
+      }
+    };
+  }, [imagePreviewUrl]);
 
   function updateField(field: keyof FormState, value: string) {
     setFormState((current) => {
@@ -97,8 +117,48 @@ export function ProductInputForm({
   function clearForm() {
     setFormState(initialFormState);
     setError("");
+    clearImage();
     onDraftChange?.(null);
     onClear?.();
+  }
+
+  function clearImage() {
+    if (imagePreviewUrl) {
+      URL.revokeObjectURL(imagePreviewUrl);
+    }
+
+    setImageFileName("");
+    setImageFileSize(0);
+    setImagePreviewUrl("");
+    setImageError("");
+  }
+
+  function handleImageChange(file: File | null) {
+    setImageError("");
+
+    if (!file) {
+      return;
+    }
+
+    if (!allowedImageTypes.includes(file.type)) {
+      clearImage();
+      setImageError("仅支持上传 PNG、JPG、JPEG、WEBP 图片。");
+      return;
+    }
+
+    if (file.size > maxImageSize) {
+      clearImage();
+      setImageError("图片过大，请上传 5MB 以内的截图。");
+      return;
+    }
+
+    if (imagePreviewUrl) {
+      URL.revokeObjectURL(imagePreviewUrl);
+    }
+
+    setImageFileName(file.name);
+    setImageFileSize(file.size);
+    setImagePreviewUrl(URL.createObjectURL(file));
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -146,6 +206,15 @@ export function ProductInputForm({
       </div>
 
       <div className="mt-5 space-y-4">
+        <ImageUploadPreview
+          previewUrl={imagePreviewUrl}
+          fileName={imageFileName}
+          fileSizeText={imageFileSize ? formatFileSize(imageFileSize) : ""}
+          error={imageError}
+          onFileChange={handleImageChange}
+          onRemove={clearImage}
+        />
+
         <label className="block">
           <span className="flex items-center gap-2 text-sm font-medium text-slate-700">
             商品标题
