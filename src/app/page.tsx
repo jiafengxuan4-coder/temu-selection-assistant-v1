@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { AnalysisReportView } from "@/components/AnalysisReportView";
@@ -76,6 +76,7 @@ export default function Home() {
             onClear={handleClear}
             onDraftChange={setCurrentProduct}
             isSubmitting={isAnalyzing}
+            recognizedFields={recognizedFields}
           />
           <section className="min-w-0">
             <div className="space-y-5">
@@ -102,3 +103,4 @@ export default function Home() {
     </main>
   );
 }
+

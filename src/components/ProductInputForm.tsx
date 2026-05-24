@@ -1,15 +1,16 @@
 ﻿"use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { ImageUploadPreview } from "@/components/ImageUploadPreview";
-import type { ProductImageInput, ProductInput } from "@/types/product";
+import type { ProductImageInput, ProductInput, RecognizedProductFields } from "@/types/product";
 
 type ProductInputFormProps = {
   onSubmit: (product: ProductInput) => void;
   onClear?: () => void;
   onDraftChange?: (product: ProductInput | null) => void;
   isSubmitting?: boolean;
+  recognizedFields?: RecognizedProductFields;
 };
 
 type FormState = {
@@ -26,6 +27,8 @@ type ImageState = ProductImageInput & {
   imageFileSize: number;
   imagePreviewUrl: string;
 };
+
+type PriceMetaState = Pick<ProductInput, "priceDisplay" | "priceCurrency" | "priceSource" | "priceCandidates">;
 
 const initialFormState: FormState = {
   title: "",
@@ -68,7 +71,8 @@ function formatFileSize(size: number): string {
 function toProductInput(
   formState: FormState,
   imageStates: ImageState[] = [],
-  allowIncomplete = false
+  allowIncomplete = false,
+  priceMeta?: PriceMetaState
 ): ProductInput | null {
   const title = formState.title.trim();
   const category = formState.category.trim();
@@ -88,6 +92,7 @@ function toProductInput(
     title,
     category,
     price: hasValidPrice ? price : 0,
+    ...(hasValidPrice && priceMeta ? priceMeta : {}),
     weeklySales: toOptionalNumber(formState.weeklySales),
     monthlySales: toOptionalNumber(formState.monthlySales),
     rating: toOptionalNumber(formState.rating),
@@ -103,25 +108,30 @@ export function ProductInputForm({
   onSubmit,
   onClear,
   onDraftChange,
-  isSubmitting = false
+  isSubmitting = false,
+  recognizedFields
 }: ProductInputFormProps) {
   const [formState, setFormState] = useState<FormState>(initialFormState);
   const [error, setError] = useState<string>("");
   const [imageStates, setImageStates] = useState<ImageState[]>([]);
   const [imageError, setImageError] = useState<string>("");
+  const [priceMeta, setPriceMeta] = useState<PriceMetaState | undefined>();
+  const [autofillMessage, setAutofillMessage] = useState<string>("");
+  const lastRecognizedSignatureRef = useRef<string>("");
 
   function updateField(field: keyof FormState, value: string) {
-    setFormState((current) => {
-      const nextState = { ...current, [field]: value };
-      onDraftChange?.(toProductInput(nextState, imageStates));
-      return nextState;
-    });
+    setFormState((current) => ({ ...current, [field]: value }));
+
+    if (field === "price") {
+      setPriceMeta(undefined);
+    }
   }
 
   function fillExampleCase() {
     setFormState(petLeashExample);
     setError("");
-    onDraftChange?.(toProductInput(petLeashExample, imageStates));
+    setPriceMeta(undefined);
+    setAutofillMessage("");
   }
 
   function clearImages() {
@@ -132,8 +142,9 @@ export function ProductInputForm({
   function clearForm() {
     setFormState(initialFormState);
     setError("");
+    setPriceMeta(undefined);
+    setAutofillMessage("");
     clearImages();
-    onDraftChange?.(null);
     onClear?.();
   }
 
@@ -187,7 +198,6 @@ export function ProductInputForm({
     try {
       const nextImages = [...imageStates, ...(await Promise.all(files.map(readImageFile)))];
       setImageStates(nextImages);
-      onDraftChange?.(toProductInput(formState, nextImages));
     } catch {
       setImageError("图片读取失败，请重新选择截图。");
     }
@@ -197,14 +207,96 @@ export function ProductInputForm({
     const nextImages = imageStates.filter((_, currentIndex) => currentIndex !== index);
     setImageStates(nextImages);
     setImageError("");
-    onDraftChange?.(toProductInput(formState, nextImages));
   }
+
+
+  useEffect(() => {
+    const allowIncomplete = imageStates.length > 0;
+    onDraftChange?.(toProductInput(formState, imageStates, allowIncomplete, priceMeta));
+  }, [formState, imageStates, priceMeta, onDraftChange]);
+
+  useEffect(() => {
+    if (!recognizedFields) {
+      lastRecognizedSignatureRef.current = "";
+      return;
+    }
+
+    const signature = JSON.stringify({
+      title: recognizedFields.title,
+      category: recognizedFields.category,
+      price: recognizedFields.price,
+      priceDisplay: recognizedFields.priceDisplay,
+      priceCurrency: recognizedFields.priceCurrency,
+      priceSource: recognizedFields.priceSource,
+      priceCandidates: recognizedFields.priceCandidates,
+      weeklySales: recognizedFields.weeklySales,
+      monthlySales: recognizedFields.monthlySales,
+      rating: recognizedFields.rating,
+      reviewsText: recognizedFields.reviewsText,
+      missingFields: recognizedFields.missingFields
+    });
+
+    if (lastRecognizedSignatureRef.current === signature) {
+      return;
+    }
+
+    lastRecognizedSignatureRef.current = signature;
+    const nextState = { ...formState };
+    let filledCount = 0;
+    let nextPriceMeta = priceMeta;
+
+    const fillTextField = (field: keyof FormState, value: string | undefined) => {
+      if (nextState[field].trim().length === 0 && value && value.trim().length > 0) {
+        nextState[field] = value.trim();
+        filledCount += 1;
+      }
+    };
+
+    const fillNumberField = (field: keyof FormState, value: number | undefined) => {
+      if (nextState[field].trim().length === 0 && typeof value === "number" && Number.isFinite(value)) {
+        nextState[field] = String(value);
+        filledCount += 1;
+      }
+    };
+
+    fillTextField("title", recognizedFields.title);
+    fillTextField("category", recognizedFields.category);
+
+    if (nextState.price.trim().length === 0 && typeof recognizedFields.price === "number" && Number.isFinite(recognizedFields.price)) {
+      nextState.price = String(recognizedFields.price);
+      filledCount += 1;
+      nextPriceMeta = {
+        priceDisplay: recognizedFields.priceDisplay,
+        priceCurrency: recognizedFields.priceCurrency,
+        priceSource: recognizedFields.priceSource,
+        priceCandidates: recognizedFields.priceCandidates
+      };
+      setPriceMeta(nextPriceMeta);
+    }
+
+    fillNumberField("weeklySales", recognizedFields.weeklySales);
+    fillNumberField("monthlySales", recognizedFields.monthlySales);
+    fillNumberField("rating", recognizedFields.rating);
+    fillTextField("reviewsText", recognizedFields.reviewsText);
+
+    const hasMissingFields = Boolean(recognizedFields.missingFields?.length);
+    setAutofillMessage(
+      filledCount > 0
+        ? hasMissingFields
+          ? "已将截图识别结果自动填入表单；部分字段未识别，可手动补充后重新生成报告。"
+          : "已将截图识别结果自动填入表单，如有错误可直接手动修改。"
+        : hasMissingFields
+          ? "部分字段未识别，可手动补充后重新生成报告。"
+          : "截图识别结果已返回，当前表单优先保留已填写内容。"
+    );
+    setFormState(nextState);
+  }, [recognizedFields, formState, priceMeta]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const hasImages = imageStates.length > 0;
-    const product = toProductInput(formState, imageStates, hasImages);
+    const product = toProductInput(formState, imageStates, hasImages, priceMeta);
 
     if (!product) {
       setError("请填写商品标题、商品类目，并确保商品价格大于 0；或先上传商品截图让系统尝试识别。");
@@ -246,6 +338,12 @@ export function ProductInputForm({
       </div>
 
       <div className="mt-5 space-y-4">
+        {autofillMessage ? (
+          <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs leading-5 text-emerald-800">
+            {autofillMessage}
+          </div>
+        ) : null}
+
         <ImageUploadPreview
           images={imageStates.map((image) => ({
             previewUrl: image.imagePreviewUrl,
@@ -378,3 +476,6 @@ export function ProductInputForm({
     </form>
   );
 }
+
+
+
