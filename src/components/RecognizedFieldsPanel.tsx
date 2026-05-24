@@ -52,6 +52,18 @@ function formatRecognizedPrice(recognizedFields: RecognizedProductFields): strin
 function formatPriceSource(source: string | undefined): string {
   return source ? priceSourceLabelMap[source] ?? source : "未识别";
 }
+function formatCategorySource(source: RecognizedProductFields["categorySource"]): string {
+  switch (source) {
+    case "manual":
+      return "手动填写";
+    case "recognized":
+      return "来自截图识别";
+    case "inferred":
+      return "根据商品标题推断";
+    default:
+      return "未识别";
+  }
+}
 
 function FieldRow({
   label,
@@ -109,7 +121,12 @@ export function RecognizedFieldsPanel({
           </div>
         ) : null}
         <FieldRow label="商品标题" value={recognizedFields.title} manualValue={manualProduct?.title} />
-        <FieldRow label="商品类目" value={recognizedFields.category} manualValue={manualProduct?.category} />
+        <FieldRow
+          label="商品类目"
+          value={recognizedFields.category}
+          manualValue={manualProduct?.category}
+          detail={`来源：${formatCategorySource(recognizedFields.categorySource)}`}
+        />
         <FieldRow
           label="商品价格"
           value={formatRecognizedPrice(recognizedFields)}
@@ -157,4 +174,5 @@ export function RecognizedFieldsPanel({
     </section>
   );
 }
+
 

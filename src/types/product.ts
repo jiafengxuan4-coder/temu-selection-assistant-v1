@@ -45,6 +45,8 @@ export type ProductInput = {
 export type RecognizedProductFields = {
   title?: string;
   category?: string;
+  inferredCategory?: string;
+  categorySource?: "manual" | "recognized" | "inferred" | "unknown";
   price?: number;
   priceDisplay?: string;
   priceCurrency?: string;
@@ -82,4 +84,5 @@ export type DataCompleteness = {
   missingFields: string[];
   confidenceImpact: "low" | "medium" | "high";
 };
+
 

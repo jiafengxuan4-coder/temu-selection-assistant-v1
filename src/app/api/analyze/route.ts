@@ -1,15 +1,25 @@
 ﻿import { NextResponse, type NextRequest } from "next/server";
 import { analyzeHotProductWithAI } from "@/lib/ai/analyzeHotProductWithAI";
 import { recognizeProductFromImage, recognizeProductFromImages } from "@/lib/ai/recognizeProductFromImage";
+import { inferCategoryFromProductInfo } from "@/lib/inferCategory";
 import type { AnalyzeProductRequest, AnalyzeProductResponse } from "@/types/ai";
-import type { ProductImageInput, ProductInput, RecognizedProductFields } from "@/types/product";
+import type { ProductImageInput, ProductInput, ProductPriceCandidate, RecognizedProductFields } from "@/types/product";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
 function parseOptionalNumber(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsedValue = Number(value);
+    return Number.isFinite(parsedValue) ? parsedValue : undefined;
+  }
+
+  return undefined;
 }
 
 function parsePositiveNumber(value: unknown): number | undefined {
@@ -44,6 +54,144 @@ function parseImageInputs(value: unknown): ProductImageInput[] {
 function hasManualPrice(value: unknown): boolean {
   return typeof parsePositiveNumber(value) === "number";
 }
+function choosePrimaryPriceCandidate(
+  candidates: ProductPriceCandidate[] | undefined
+): ProductPriceCandidate | undefined {
+  if (!candidates || candidates.length === 0) {
+    return undefined;
+  }
+
+  const priority: Array<ProductPriceCandidate["source"]> = [
+    "final_price",
+    "estimated_price",
+    "coupon_price",
+    "discount_price",
+    "current_sale_price",
+    "previous_price",
+    "original_price",
+    "strikethrough_price",
+    "uncertain",
+    "other"
+  ];
+
+  return priority
+    .map((source) => candidates.find((candidate) => candidate.source === source))
+    .find((candidate): candidate is ProductPriceCandidate => Boolean(candidate))
+    ?? candidates[0];
+}
+
+function getRecognizedMissingFields(recognizedProduct: RecognizedProductFields): string[] {
+  const missingFields: string[] = [];
+
+  if (!recognizedProduct.title) {
+    missingFields.push("title");
+  }
+
+  if (!recognizedProduct.category) {
+    missingFields.push("category");
+  }
+
+  if (typeof recognizedProduct.price !== "number") {
+    missingFields.push("price");
+  }
+
+  if (typeof recognizedProduct.weeklySales !== "number" && typeof recognizedProduct.monthlySales !== "number") {
+    missingFields.push("sales");
+  }
+
+  if (typeof recognizedProduct.rating !== "number") {
+    missingFields.push("rating");
+  }
+
+  if (!recognizedProduct.reviewsText) {
+    missingFields.push("reviewsText");
+  }
+
+  return missingFields;
+}
+function normalizeRecognizedProduct(
+  recognizedProduct: RecognizedProductFields | null
+): RecognizedProductFields | null {
+  if (!recognizedProduct) {
+    return null;
+  }
+
+  const primaryCandidate = choosePrimaryPriceCandidate(recognizedProduct.priceCandidates);
+  const inferredCategory = recognizedProduct.category
+    ? undefined
+    : inferCategoryFromProductInfo({ recognizedTitle: recognizedProduct.title });
+  const baseProduct: RecognizedProductFields = {
+    ...recognizedProduct,
+    category: recognizedProduct.category ?? inferredCategory,
+    inferredCategory: recognizedProduct.inferredCategory ?? inferredCategory,
+    categorySource: recognizedProduct.category
+      ? "recognized"
+      : inferredCategory
+        ? "inferred"
+        : recognizedProduct.categorySource ?? "unknown",
+    warnings: inferredCategory
+      ? [
+          ...(recognizedProduct.warnings ?? []),
+          "商品类目由标题推断得到，建议人工核对。"
+        ]
+      : recognizedProduct.warnings
+  };
+
+  if (typeof baseProduct.price === "number" || !primaryCandidate) {
+    return {
+      ...baseProduct,
+      missingFields: getRecognizedMissingFields(baseProduct)
+    };
+  }
+
+  const normalizedProduct: RecognizedProductFields = {
+    ...baseProduct,
+    price: primaryCandidate.value,
+    priceDisplay: primaryCandidate.display,
+    priceCurrency: primaryCandidate.currency,
+    priceSource: primaryCandidate.source === "other" ? undefined : primaryCandidate.source,
+    warnings: [
+      ...(baseProduct.warnings ?? []),
+      "已根据识别到的价格候选补齐商品主价格，建议人工核对。"
+    ]
+  };
+
+  return {
+    ...normalizedProduct,
+    missingFields: getRecognizedMissingFields(normalizedProduct)
+  };
+}
+
+function getMissingProductFields(value: Record<string, unknown>): string[] {
+  const missingFields: string[] = [];
+
+  if (!parseOptionalString(value.title)) {
+    missingFields.push("商品标题");
+  }
+
+  if (!parseOptionalString(value.category)) {
+    missingFields.push("商品类目");
+  }
+
+  if (typeof parsePositiveNumber(value.price) !== "number") {
+    missingFields.push("商品价格");
+  }
+
+  return missingFields;
+}
+
+function buildMissingProductMessage(missingFields: string[], hasSubmittedImages: boolean): string {
+  if (missingFields.length === 0) {
+    return hasSubmittedImages
+      ? "截图识别结果暂不完整，请手动补充后再生成报告。"
+      : "请求体缺少 title、category 或有效 price，且 price 必须大于 0。";
+  }
+
+  return hasSubmittedImages
+    ? `截图识别未能获取${missingFields.join("、")}，请手动补充后再生成报告。`
+    : `请求体缺少${missingFields.join("、")}，请补充后再生成报告。`;
+}
+
 
 function parseProduct(value: Record<string, unknown>): ProductInput | null {
   const title = parseOptionalString(value.title);
@@ -80,11 +228,22 @@ function mergeRecognizedProduct(
   rawProduct: Record<string, unknown>,
   recognizedProduct: RecognizedProductFields | null
 ): Record<string, unknown> {
+  const title = parseOptionalString(rawProduct.title) || recognizedProduct?.title;
+  const manualCategory = parseOptionalString(rawProduct.category);
+  const inferredCategory = recognizedProduct?.inferredCategory
+    ?? inferCategoryFromProductInfo({ title, recognizedTitle: recognizedProduct?.title });
+  const category = manualCategory || recognizedProduct?.category || inferredCategory;
+  const categorySource = manualCategory
+    ? "manual"
+    : recognizedProduct?.categorySource ?? (recognizedProduct?.category ? "recognized" : inferredCategory ? "inferred" : "unknown");
+
   return {
     ...recognizedProduct,
     ...rawProduct,
-    title: parseOptionalString(rawProduct.title) || recognizedProduct?.title,
-    category: parseOptionalString(rawProduct.category) || recognizedProduct?.category,
+    title,
+    category,
+    inferredCategory,
+    categorySource,
     price: parsePositiveNumber(rawProduct.price) ?? recognizedProduct?.price,
     priceDisplay: parseOptionalString(rawProduct.priceDisplay)
       || (hasManualPrice(rawProduct.price) ? undefined : recognizedProduct?.priceDisplay),
@@ -129,6 +288,8 @@ function toRecognizedFieldsSummary(
   return {
     title: recognizedProduct.title,
     category: recognizedProduct.category,
+    inferredCategory: recognizedProduct.inferredCategory,
+    categorySource: recognizedProduct.categorySource,
     price: recognizedProduct.price,
     priceDisplay: recognizedProduct.priceDisplay,
     priceCurrency: recognizedProduct.priceCurrency,
@@ -164,7 +325,7 @@ export async function POST(request: NextRequest) {
   const imageInputs = parseImageInputs(rawProduct.images);
   const imageBase64 = parseOptionalString(rawProduct.imageBase64);
   const hasSubmittedImages = imageInputs.length > 0 || Boolean(imageBase64);
-  const recognizedProduct = imageInputs.length > 0
+  const rawRecognizedProduct = imageInputs.length > 0
     ? await recognizeProductFromImages(imageInputs)
     : imageBase64
       ? await recognizeProductFromImage({
@@ -173,13 +334,13 @@ export async function POST(request: NextRequest) {
           imageFileName: parseOptionalString(rawProduct.imageFileName)
         })
       : null;
+  const recognizedProduct = normalizeRecognizedProduct(rawRecognizedProduct);
   const mergedProduct = mergeRecognizedProduct(rawProduct, recognizedProduct);
   const product = parseProduct(mergedProduct);
 
   if (!product) {
-    const error = hasSubmittedImages
-      ? "截图识别未能完整获取商品标题、类目或价格，请手动补充后再生成报告。"
-      : "请求体缺少 title、category 或有效 price，且 price 必须大于 0。";
+    const missingFields = getMissingProductFields(mergedProduct);
+    const error = buildMissingProductMessage(missingFields, hasSubmittedImages);
 
     return jsonResponse({ ok: false, error, recognizedFields: toRecognizedFieldsSummary(recognizedProduct) }, 400);
   }
@@ -220,3 +381,8 @@ export async function POST(request: NextRequest) {
     return jsonResponse({ ok: false, error: message }, 400);
   }
 }
+
+
+
+
+
