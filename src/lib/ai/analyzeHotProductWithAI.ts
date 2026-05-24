@@ -3,6 +3,7 @@ import {
   buildHotProductAnalysisSystemPrompt,
   buildHotProductAnalysisUserPrompt
 } from "@/lib/ai/prompts";
+import { parseAIAnalysisReport } from "@/lib/ai/parseAIAnalysisReport";
 import { getAIProvider, getAIProviderConfig } from "@/lib/ai/providers";
 import type { ProductInput } from "@/types/product";
 import type { AnalysisReport } from "@/types/recommendation";
@@ -26,27 +27,8 @@ function fallbackToMock(product: ProductInput, message: string): AIAnalysisResul
   };
 }
 
-function extractJsonText(text: string): string {
-  const trimmedText = text.trim();
-  const fencedJsonMatch = trimmedText.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-
-  return fencedJsonMatch?.[1]?.trim() ?? trimmedText;
-}
-
-function isAnalysisReport(value: unknown): value is AnalysisReport {
-  const report = value as Partial<AnalysisReport>;
-
-  return Boolean(
-    report &&
-      typeof report === "object" &&
-      report.input &&
-      report.dataCompleteness &&
-      report.hotProductAnalysis &&
-      report.directCopyRisk &&
-      Array.isArray(report.recommendations) &&
-      typeof report.finalConclusion === "string" &&
-      Array.isArray(report.actionSuggestions)
-  );
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
 }
 
 export async function analyzeHotProductWithAI(
@@ -57,7 +39,12 @@ export async function analyzeHotProductWithAI(
   try {
     config = getAIProviderConfig();
   } catch (error) {
-    const message = error instanceof Error ? error.message : "AI Provider 配置异常。";
+    const message = getErrorMessage(error, "AI Provider 配置异常。");
+    console.warn("[AI_ANALYZE_CONFIG_FAILED]", {
+      provider: "unknown",
+      errorType: "config",
+      message
+    });
     return fallbackToMock(product, `AI Provider 配置失败，已使用 Mock 兜底分析。原因：${message}`);
   }
 
@@ -76,23 +63,29 @@ export async function analyzeHotProductWithAI(
       ],
       config
     );
-    const parsed = JSON.parse(extractJsonText(response.text)) as unknown;
-
-    if (!isAnalysisReport(parsed)) {
-      return fallbackToMock(product, "AI 返回内容结构不符合报告类型，已使用 Mock 兜底分析。");
-    }
+    const report = parseAIAnalysisReport({
+      product,
+      rawText: response.text
+    });
 
     return {
-      report: parsed,
+      report,
       source: "api",
-      message: `已通过 ${config.provider} Provider 生成报告。`
+      message: `已通过 AI Provider 生成报告。当前 provider：${config.provider}。`
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "未知错误";
+    const message = getErrorMessage(error, "未知错误");
+    const isParseError = message.includes("解析") || message.includes("结构");
+    const fallbackMessage = isParseError
+      ? `AI 返回内容解析失败，已使用 Mock 兜底分析。原因：${message}`
+      : `AI Provider 调用失败，已使用 Mock 兜底分析。原因：${message}`;
 
-    return fallbackToMock(
-      product,
-      `AI Provider 调用失败，已使用 Mock 兜底分析。原因：${message}`
-    );
+    console.warn("[AI_ANALYZE_FALLBACK]", {
+      provider: config.provider,
+      errorType: isParseError ? "parse" : "provider",
+      message
+    });
+
+    return fallbackToMock(product, fallbackMessage);
   }
 }

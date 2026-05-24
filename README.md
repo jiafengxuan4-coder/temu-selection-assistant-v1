@@ -49,6 +49,28 @@ http://localhost:3000
 
 不要把 `.env.local` 提交到 Git。
 
+## 部署环境变量
+
+部署到 Vercel 或其他线上环境时，需要在部署平台的 Environment Variables 中配置：
+
+```env
+AI_PROVIDER=qwen
+AI_API_KEY=your_api_key_here
+AI_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+AI_MODEL=qwen-plus
+```
+
+可选 provider：
+
+- `openai`
+- `qwen`
+- `doubao`
+- `deepseek`
+
+`OPENAI_API_KEY` 仅作为兼容旧配置使用。新配置优先使用 `AI_API_KEY`。
+
+`.env.local` 只用于本地开发，不应提交到 Git。线上环境变量应在部署平台后台配置，不要写入代码。
+
 ## 当前开发状态
 
 当前完成 Task 001：初始化项目和业务文档落地。
