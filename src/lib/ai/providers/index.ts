@@ -2,7 +2,13 @@ import { deepseekProvider } from "./deepseekProvider";
 import { doubaoProvider } from "./doubaoProvider";
 import { openaiProvider } from "./openaiProvider";
 import { qwenProvider } from "./qwenProvider";
-import type { AIProvider, AIProviderConfig, AIProviderName } from "./types";
+import type {
+  AIChatMessage,
+  AIProvider,
+  AIProviderConfig,
+  AIProviderName,
+  AIProviderResponse
+} from "./types";
 
 const DEFAULT_CONFIG: Record<AIProviderName, { baseUrl: string; model: string }> = {
   openai: {

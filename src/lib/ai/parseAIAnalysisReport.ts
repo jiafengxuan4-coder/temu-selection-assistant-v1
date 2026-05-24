@@ -115,13 +115,13 @@ function hasEnglishHeavyText(value: string): boolean {
 }
 
 function pickString(value: unknown, fallback: string): string {
-  return sanitizeText(typeof value === "string" && value.trim() ? value.trim() : fallback);
+  return sanitizeText(typeof value === "string" && value.trim().length > 0 ? value.trim() : fallback);
 }
 
 function pickStringArray(value: unknown): string[] {
   return Array.isArray(value)
     ? value
-        .filter((item): item is string => typeof item === "string" && item.trim())
+        .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
         .map((item) => sanitizeText(item.trim()))
     : [];
 }
