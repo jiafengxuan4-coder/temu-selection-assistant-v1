@@ -1,3 +1,5 @@
+import { CopyReportButton } from "@/components/CopyReportButton";
+import { ExportMarkdownButton } from "@/components/ExportMarkdownButton";
 import { RecommendationCard } from "@/components/RecommendationCard";
 import type {
   ConfidenceLevel,
@@ -56,7 +58,16 @@ export function AnalysisReportView({ report }: AnalysisReportViewProps) {
   return (
     <div className="space-y-5">
       <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="text-xl font-semibold text-slate-950">结构化选品报告</h2>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-slate-950">结构化选品报告</h2>
+            <p className="mt-1 text-sm text-slate-500">可复制为中文纯文本，方便发给学员、运营同事或客户。</p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <CopyReportButton report={report} />
+            <ExportMarkdownButton report={report} />
+          </div>
+        </div>
         <div className="mt-4 grid gap-3 text-sm leading-6 text-slate-700 sm:grid-cols-2">
           <p><strong className="text-slate-950">商品标题：</strong>{report.input.title}</p>
           <p><strong className="text-slate-950">商品类目：</strong>{report.input.category}</p>
