@@ -31,13 +31,29 @@ function parseOptionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
 }
 
+function parseProductSpecs(value: unknown): ProductInput["productSpecs"] | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const productSpecs = {
+    mainProductSpec: parseOptionalString(value.mainProductSpec),
+    accessorySpec: parseOptionalString(value.accessorySpec),
+    productSize: parseOptionalString(value.productSize),
+    packageWeight: parseOptionalString(value.packageWeight),
+    packageSize: parseOptionalString(value.packageSize),
+    colorSizeOptions: parseOptionalString(value.colorSizeOptions)
+  };
+
+  return Object.values(productSpecs).some(Boolean) ? productSpecs : undefined;
+}
 function parseImageInputs(value: unknown): ProductImageInput[] {
   if (!Array.isArray(value)) {
     return [];
   }
 
   return value
-    .slice(0, 5)
+    .slice(0, 10)
     .filter(isRecord)
     .map((item) => {
       const imageBase64 = parseOptionalString(item.imageBase64);
@@ -183,12 +199,12 @@ function getMissingProductFields(value: Record<string, unknown>): string[] {
 function buildMissingProductMessage(missingFields: string[], hasSubmittedImages: boolean): string {
   if (missingFields.length === 0) {
     return hasSubmittedImages
-      ? "截图识别结果暂不完整，请手动补充后再生成报告。"
+      ? "未从图片中识别到完整商品信息，系统已将这些图片作为产品参考素材使用。请补充商品标题、类目、价格等基础信息后继续生成报告。"
       : "请求体缺少 title、category 或有效 price，且 price 必须大于 0。";
   }
 
   return hasSubmittedImages
-    ? `截图识别未能获取${missingFields.join("、")}，请手动补充后再生成报告。`
+    ? `未从图片中识别到完整商品信息，系统已将这些图片作为产品参考素材使用。请补充商品标题、类目、价格等基础信息后继续生成报告。当前缺少：${missingFields.join("、")}。`
     : `请求体缺少${missingFields.join("、")}，请补充后再生成报告。`;
 }
 
@@ -216,6 +232,7 @@ function parseProduct(value: Record<string, unknown>): ProductInput | null {
     monthlySales: parseOptionalNumber(value.monthlySales),
     rating: parseOptionalNumber(value.rating),
     reviewsText: parseOptionalString(value.reviewsText),
+    productSpecs: parseProductSpecs(value.productSpecs),
     imageUrl: parseOptionalString(value.imageUrl),
     imageFileName: parseOptionalString(value.imageFileName),
     imageBase64: parseOptionalString(value.imageBase64),
@@ -255,6 +272,7 @@ function mergeRecognizedProduct(
     monthlySales: parseOptionalNumber(rawProduct.monthlySales) ?? recognizedProduct?.monthlySales,
     rating: parseOptionalNumber(rawProduct.rating) ?? recognizedProduct?.rating,
     reviewsText: parseOptionalString(rawProduct.reviewsText) || recognizedProduct?.reviewsText,
+    productSpecs: parseProductSpecs(rawProduct.productSpecs),
     imageUrl: parseOptionalString(rawProduct.imageUrl),
     imageFileName: parseOptionalString(rawProduct.imageFileName),
     imageBase64: parseOptionalString(rawProduct.imageBase64),
@@ -282,7 +300,7 @@ function toRecognizedFieldsSummary(
   }
 
   if (missingFields.length > 0) {
-    warnings.push(`未识别字段：${missingFields.join("、")}`);
+    warnings.push("未从图片中识别到完整商品信息，系统已将这些图片作为产品参考素材使用。请补充商品标题、类目、价格等基础信息后继续生成报告。");
   }
 
   return {
@@ -358,11 +376,12 @@ export async function POST(request: NextRequest) {
       monthlySales: product.monthlySales,
       rating: product.rating,
       reviewsText: product.reviewsText,
+      productSpecs: product.productSpecs,
       imageUrl: product.imageUrl,
       imageFileName: product.imageFileName
     };
     const result = await analyzeHotProductWithAI(analysisProduct);
-    const imageMessage = hasSubmittedImages ? "已启用 Qwen-VL 综合识别商品截图。" : "";
+    const imageMessage = hasSubmittedImages ? "已接收上传图片，并作为产品参考素材参与分析。图片识别结果仅作辅助，报告优先使用手动填写的信息。" : "";
     const message = [result.message, imageMessage].filter(Boolean).join(" ");
 
     return jsonResponse(
@@ -381,8 +400,3 @@ export async function POST(request: NextRequest) {
     return jsonResponse({ ok: false, error: message }, 400);
   }
 }
-
-
-
-
-

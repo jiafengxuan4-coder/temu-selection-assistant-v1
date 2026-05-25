@@ -1,185 +1,188 @@
-import type {
-  ConfidenceLevel,
-  HotProductFactorType,
-  PriceComparisonRiskLevel
-} from "@/types/analysis";
-import type {
-  AnalysisReport,
-  RecommendationDirectionType,
-  RecommendationLevel
-} from "@/types/recommendation";
-import type { ProductInput } from "@/types/product";
+﻿import type { AnalysisReport } from "@/types/recommendation";
 
-const factorLabelMap: Record<HotProductFactorType, string> = {
-  price: "价格因素",
-  color: "颜色因素",
-  style: "款式因素",
-  image_click_rate: "图片点击率因素",
-  comprehensive: "综合因素",
-  unknown: "未知因素"
-};
-
-const confidenceLabelMap: Record<ConfidenceLevel, string> = {
-  high: "高",
-  medium: "中",
-  low: "低",
-  unknown: "未知"
-};
-
-const riskLevelLabelMap: Record<PriceComparisonRiskLevel, string> = {
-  low: "低风险",
-  medium: "中风险",
-  high: "高风险",
-  unknown: "未知"
-};
-
-const recommendationLevelLabelMap: Record<RecommendationLevel, string> = {
-  priority_test: "推荐优先测试",
-  small_batch_test: "可以小批量测试",
-  cautious: "谨慎，不建议优先做",
-  not_recommended: "不建议做"
-};
-
-const recommendationTypeLabelMap: Record<RecommendationDirectionType, string> = {
-  bundle: "组合款方向",
-  upgrade: "升级款方向",
-  scene_segment: "场景细分方向",
-  user_segment: "人群细分方向",
-  function_difference: "功能差异方向",
-  review_pain_point: "评论痛点改良方向",
-  image_expression: "图片表达迁移方向",
-  cautious: "谨慎方向"
-};
-
-function formatOptionalNumber(value: number | undefined): string {
-  return typeof value === "number" ? String(value) : "未提供";
-}
-
-function formatProductPrice(product: ProductInput): string {
-  return product.priceDisplay && product.priceDisplay.trim().length > 0
-    ? product.priceDisplay
-    : String(product.price);
-}
+export type PackagePlanSelection = "A" | "B";
 
 function formatList(items: string[]): string {
-  if (items.length === 0) {
-    return "- 暂无";
-  }
-
+  if (items.length === 0) return "- 暂无";
   return items.map((item) => `- ${item}`).join("\n");
 }
 
-function getReadableRiskWarning(warning: string): string {
-  if (warning.includes("核价")) {
-    return "该产品仍需经过平台核价验证。";
+function formatProductPrice(report: AnalysisReport): string {
+  const priceDisplay = report.input.priceDisplay?.trim();
+  return priceDisplay && priceDisplay.length > 0 ? priceDisplay : String(report.input.price);
+}
+
+function formatSpecValue(value: string | undefined): string {
+  return value?.trim() ? value.trim() : "未提供";
+}
+
+function formatSpecsLines(report: AnalysisReport): string[] {
+  const specs = report.input.productSpecs;
+
+  return [
+    `主产品规格：${formatSpecValue(specs?.mainProductSpec)}`,
+    `配件规格：${formatSpecValue(specs?.accessorySpec)}`,
+    `产品尺寸：${formatSpecValue(specs?.productSize)}`,
+    `包装重量：${formatSpecValue(specs?.packageWeight)}`,
+    `包装尺寸：${formatSpecValue(specs?.packageSize)}`,
+    `颜色/尺码选项：${formatSpecValue(specs?.colorSizeOptions)}`
+  ];
+}
+
+function getSelectedPlan(report: AnalysisReport, selectedPlan: PackagePlanSelection) {
+  const pre = report.preGenerationReport;
+
+  if (selectedPlan === "B") {
+    return {
+      label: "方案 B",
+      combinationName: pre.planB.combinationName,
+      combinationContent: pre.planB.combinationContent,
+      targetUsers: pre.planB.targetUsers,
+      usageScene: pre.planB.usageScene,
+      coreSellingPoints: pre.planB.coreSellingPoints
+    };
   }
 
-  return warning;
+  return {
+    label: "方案 A",
+    combinationName: pre.planA.combinationName,
+    combinationContent: pre.planA.combinationContent,
+    targetUsers: pre.planA.targetUsers,
+    usageScene: pre.planA.usageScene,
+    coreSellingPoints: pre.planA.coreSellingPoints
+  };
+}
+
+export function formatImageGenerationPackage(
+  report: AnalysisReport,
+  selectedPlan: PackagePlanSelection = "A"
+): string {
+  const pkg = report.preGenerationReport.imageGenerationPackage;
+  const plan = getSelectedPlan(report, selectedPlan);
+
+  return [
+    "请根据以下资料生成 TEMU 商品图：",
+    `当前使用方案：${plan.label}`,
+    `产品名称：${pkg.productName}`,
+    `产品类目：${pkg.productCategory}`,
+    `推荐组合方案：${plan.combinationName}`,
+    `组合内容：${plan.combinationContent}`,
+    `目标人群：${plan.targetUsers}`,
+    `使用场景：${plan.usageScene}`,
+    `核心卖点：${plan.coreSellingPoints}`,
+    `参考图片：${pkg.referenceImages}`,
+    `生成图片数量：${pkg.imageCount}`,
+    `图片比例：${pkg.imageRatio}`,
+    `图片风格：${pkg.imageStyle}`,
+    "规格信息：",
+    ...formatSpecsLines(report),
+    `禁止事项：${pkg.restrictions}`,
+    "固定要求：如果有规格信息，请生成一张规格/尺码说明图；如果规格信息不完整，不要编造尺寸、重量、材质、承重或认证数据。",
+    "第 5 张图建议为规格/细节图，优先展示规格、尺寸、尺码、配件清单；如果规格信息不足，则只展示真实可见的产品细节，不要编造数据。"
+  ].join("\n");
+}
+
+export function formatTitleSellingPointPackage(
+  report: AnalysisReport,
+  selectedPlan: PackagePlanSelection = "A"
+): string {
+  const pkg = report.preGenerationReport.titleSellingPointPackage;
+  const plan = getSelectedPlan(report, selectedPlan);
+
+  return [
+    "请根据以下资料生成 TEMU 商品标题和卖点：",
+    `当前使用方案：${plan.label}`,
+    `产品名称：${pkg.productName}`,
+    `产品类目：${pkg.productCategory}`,
+    `组合方案：${plan.combinationName}`,
+    `产品图片 / AI 生成图：${pkg.productImages}`,
+    `目标平台：${pkg.targetPlatform}`,
+    "输出要求：",
+    ...pkg.outputRequirements.map((item) => `- ${item}`),
+    "固定要求：",
+    ...pkg.fixedRequirements.map((item) => `- ${item}`)
+  ].join("\n");
 }
 
 export function formatAnalysisReportText(report: AnalysisReport): string {
-  const hasNoSales = !report.dataCompleteness.hasWeeklySales && !report.dataCompleteness.hasMonthlySales;
-  const reviewStatus = report.dataCompleteness.hasReviews ? "已提供" : "未提供";
-  const imageRecognition = report.imageRecognition;
+  const pre = report.preGenerationReport;
 
-  const dataCompletenessNotes = [
-    ...report.dataCompleteness.missingFields,
-    ...(hasNoSales ? ["缺少销量数据，销售潜力判断置信度降低。"] : []),
-    ...(!report.dataCompleteness.hasRating ? ["缺少评分数据，无法判断用户满意度。"] : []),
-    ...(!report.dataCompleteness.hasReviews ? ["缺少评论内容，本次不会分析用户真实反馈痛点。"] : [])
-  ];
-
-  const hotProductFactorsText = report.hotProductAnalysis.possibleWinningFactors
-    .map(
-      (factor, index) => [
-        `${index + 1}.`,
-        `- 因素：${factorLabelMap[factor.factor]}`,
-        `- 置信度：${confidenceLabelMap[factor.confidence]}`,
-        `- 判断理由：${factor.reason}`
-      ].join("\n")
-    )
-    .join("\n\n");
-
-  const riskWarnings = report.directCopyRisk.riskWarnings.map(getReadableRiskWarning);
-  const riskWarningText = report.directCopyRisk.riskLevel === "high"
-    ? ["直接跟款风险较高，不建议只改标题、图片或描述后上架。", ...riskWarnings]
-    : riskWarnings;
-
-  const recommendationsText = report.recommendations
-    .map(
-      (recommendation, index) => [
-        `${index + 1}. ${recommendation.title}`,
-        `- 推荐方向：${recommendationTypeLabelMap[recommendation.type]}`,
-        `- 推荐产品方案：${recommendation.productIdea}`,
-        `- 推荐等级：${recommendationLevelLabelMap[recommendation.level]}`,
-        `- 销售潜力分：${recommendation.score.salesPotentialScore}`,
-        `- 核价通过分：${recommendation.score.priceApprovalScore}`,
-        `- 综合推荐分：${recommendation.score.finalRecommendationScore}`,
-        `- 推荐理由：${recommendation.reason}`,
-        `- 为什么降低比价风险：${recommendation.howItReducesPriceComparisonRisk}`,
-        `- 为什么仍有销售机会：${recommendation.whyItStillHasSalesPotential}`,
-        `- 潜在风险：\n${formatList(recommendation.potentialRisks)}`
-      ].join("\n")
-    )
-    .join("\n\n");
+  const materialRows = pre.materialChecklist
+    .map((item) => `| ${item.materialType} | ${item.requirement} | ${item.usage} |`)
+    .join("\n");
 
   return [
-    "# TEMU 核价选品报告",
+    "# TEMU AI 图文生成前置报告",
     "",
-    "## 一、爆款基础信息",
+    "根据产品信息，自动生成组合方案、1688 素材清单、ChatGPT 生图资料包和标题卖点资料包。",
     "",
-    `- 商品标题：${report.input.title}`,
-    `- 商品类目：${report.input.category}`,
-    `- 商品价格：${formatProductPrice(report.input)}`,
-    `- 周销量：${formatOptionalNumber(report.input.weeklySales)}`,
-    `- 月销量：${formatOptionalNumber(report.input.monthlySales)}`,
-    `- 商品评分：${formatOptionalNumber(report.input.rating)}`,
-    `- 评论数据状态：${reviewStatus}`,
+    "## 一、产品基础识别",
     "",
-    "## 二、数据完整度提示",
+    `- 产品名称：${pre.productBasics.productName}`,
+    `- 产品类目：${pre.productBasics.productCategory}`,
+    `- 商品价格：${formatProductPrice(report)}`,
+    `- 当前产品组成：${pre.productBasics.currentComposition}`,
+    `- 产品主要用途：${pre.productBasics.mainUse}`,
+    `- 适合人群：${pre.productBasics.targetUsers}`,
+    `- 主要使用场景：${pre.productBasics.usageScenes}`,
     "",
-    formatList(Array.from(new Set(dataCompletenessNotes))),
+    "## 二、产品包装价值判断",
     "",
-    "## 三、模拟图片识别结果",
+    `- 是否值得继续包装：${pre.packagingValue.worthPackaging}`,
+    `- 产品类型：${pre.packagingValue.productType}`,
+    `- 比价风险：${pre.packagingValue.priceComparisonRisk}`,
+    `- 可变形空间：${pre.packagingValue.transformationSpace}`,
+    `- 图片表达空间：${pre.packagingValue.imageExpressionSpace}`,
+    `- 一句话判断：${pre.packagingValue.oneSentenceJudgment}`,
     "",
-    "当前版本为 MVP 演示版，图片识别暂未接入真实 AI，本部分为模拟图片识别结果。",
+    "## 三、推荐组合方案",
     "",
-    `- 产品类型：${imageRecognition?.productType ?? "未知"}`,
-    `- 类目：${imageRecognition?.category ?? "未知"}`,
-    `- 主色：${imageRecognition?.mainColors.join("、") ?? "未知"}`,
-    `- 产品结构：${imageRecognition?.productStructure ?? "未知"}`,
-    `- 标准化程度：${imageRecognition?.standardizationLevel ?? "未知"}`,
-    `- 使用场景：${imageRecognition?.usageScenes.join("、") ?? "未知"}`,
-    `- 目标人群：${imageRecognition?.targetUsers.join("、") ?? "未知"}`,
-    `- 图片点击潜力因素：${imageRecognition?.clickPotentialFactors.join("、") ?? "未知"}`,
+    "### 方案 A：优先测试方案",
     "",
-    "## 四、疑似爆款因素",
+    `- 组合名称：${pre.planA.combinationName}`,
+    `- 组合内容：${pre.planA.combinationContent}`,
+    `- 目标人群：${pre.planA.targetUsers}`,
+    `- 使用场景：${pre.planA.usageScene}`,
+    `- 核心卖点：${pre.planA.coreSellingPoints}`,
+    `- 为什么适合优先测试：${pre.planA.whyPriorityTest}`,
+    `- 适合生成什么类型图片：${pre.planA.suitableImageTypes}`,
     "",
-    hotProductFactorsText || "- 暂无疑似爆款因素",
+    "### 方案 B：备选升级方案",
     "",
-    "## 五、直接跟款风险",
+    `- 组合名称：${pre.planB.combinationName}`,
+    `- 组合内容：${pre.planB.combinationContent}`,
+    `- 目标人群：${pre.planB.targetUsers}`,
+    `- 使用场景：${pre.planB.usageScene}`,
+    `- 核心卖点：${pre.planB.coreSellingPoints}`,
+    `- 适合什么时候尝试：${pre.planB.whenToTry}`,
+    `- 需要注意什么：${pre.planB.notes}`,
     "",
-    `- 风险等级：${riskLevelLabelMap[report.directCopyRisk.riskLevel]}`,
-    `- 风险分：${report.directCopyRisk.riskScore}`,
-    "- 风险原因：",
-    formatList(report.directCopyRisk.reasons),
-    "- 风险警告：",
-    formatList(Array.from(new Set(riskWarningText))),
-    "- 降低风险建议：",
-    formatList(report.directCopyRisk.riskReductionSuggestions),
+    pre.priorityAdvice,
     "",
-    "## 六、差异化推荐方向",
+    "## 四、1688 素材准备清单",
     "",
-    recommendationsText,
+    "| 素材类型 | 是否必须 | 用途 |",
+    "| --- | --- | --- |",
+    materialRows,
     "",
-    "## 七、最终结论",
+    "## 五、复制给 ChatGPT 的生图资料包",
     "",
-    report.finalConclusion,
+    "```text",
+    formatImageGenerationPackage(report),
+    "```",
     "",
-    "## 八、操作建议",
+    "## 六、复制给 ChatGPT 的标题卖点资料包",
     "",
-    formatList(report.actionSuggestions),
+    "```text",
+    formatTitleSellingPointPackage(report),
+    "```",
     "",
-    "免责声明：本报告为选品辅助分析，不代表产品会爆，也不代表会通过核价。上架前仍需结合供应链、1688 同款情况、核价结果和实际运营数据进一步判断。"
+    "## 七、边界提醒",
+    "",
+    pre.boundaryReminder,
+    "",
+    "## 附：操作建议",
+    "",
+    formatList(report.actionSuggestions)
   ].join("\n");
 }

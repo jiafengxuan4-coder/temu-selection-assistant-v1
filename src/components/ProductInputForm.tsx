@@ -21,6 +21,12 @@ type FormState = {
   monthlySales: string;
   rating: string;
   reviewsText: string;
+  mainProductSpec: string;
+  accessorySpec: string;
+  productSize: string;
+  packageWeight: string;
+  packageSize: string;
+  colorSizeOptions: string;
 };
 
 type ImageState = ProductImageInput & {
@@ -37,7 +43,13 @@ const initialFormState: FormState = {
   weeklySales: "",
   monthlySales: "",
   rating: "",
-  reviewsText: ""
+  reviewsText: "",
+  mainProductSpec: "",
+  accessorySpec: "",
+  productSize: "",
+  packageWeight: "",
+  packageSize: "",
+  colorSizeOptions: ""
 };
 
 const petLeashExample: FormState = {
@@ -48,12 +60,18 @@ const petLeashExample: FormState = {
   monthlySales: "1200",
   rating: "4.6",
   reviewsText:
-    "The leash is strong and useful for walking dogs at night. Some buyers want a harness and poop bag holder included."
+    "The leash is strong and useful for walking dogs at night. Some buyers want a harness and poop bag holder included.",
+  mainProductSpec: "反光牵引绳，适合夜间遛狗场景",
+  accessorySpec: "宠物背带、拾便袋收纳器",
+  productSize: "",
+  packageWeight: "",
+  packageSize: "",
+  colorSizeOptions: "黑色、橙色等可选颜色"
 };
 
 const allowedImageTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
 const maxImageSize = 5 * 1024 * 1024;
-const maxImageCount = 5;
+const maxImageCount = 10;
 
 function toOptionalNumber(value: string): number | undefined {
   if (!value.trim()) {
@@ -64,6 +82,18 @@ function toOptionalNumber(value: string): number | undefined {
   return Number.isFinite(parsedValue) ? parsedValue : undefined;
 }
 
+function toOptionalProductSpecs(formState: FormState): ProductInput["productSpecs"] | undefined {
+  const productSpecs = {
+    mainProductSpec: formState.mainProductSpec.trim() || undefined,
+    accessorySpec: formState.accessorySpec.trim() || undefined,
+    productSize: formState.productSize.trim() || undefined,
+    packageWeight: formState.packageWeight.trim() || undefined,
+    packageSize: formState.packageSize.trim() || undefined,
+    colorSizeOptions: formState.colorSizeOptions.trim() || undefined
+  };
+
+  return Object.values(productSpecs).some(Boolean) ? productSpecs : undefined;
+}
 function formatFileSize(size: number): string {
   return `${(size / 1024 / 1024).toFixed(2)} MB`;
 }
@@ -97,6 +127,7 @@ function toProductInput(
     monthlySales: toOptionalNumber(formState.monthlySales),
     rating: toOptionalNumber(formState.rating),
     reviewsText: formState.reviewsText.trim() || undefined,
+    productSpecs: toOptionalProductSpecs(formState),
     images,
     imageBase64: images[0]?.imageBase64,
     imageMimeType: images[0]?.imageMimeType,
@@ -181,7 +212,7 @@ export function ProductInputForm({
     }
 
     if (imageStates.length + files.length > maxImageCount) {
-      setImageError("最多支持上传 5 张截图，请删除部分图片后重试。");
+      setImageError("最多支持上传 10 张截图，请删除部分图片后重试。");
       return;
     }
 
@@ -283,11 +314,11 @@ export function ProductInputForm({
     setAutofillMessage(
       filledCount > 0
         ? hasMissingFields
-          ? "已将截图识别结果自动填入表单；部分字段未识别，可手动补充后重新生成报告。"
-          : "已将截图识别结果自动填入表单，如有错误可直接手动修改。"
+          ? "已将图片识别结果自动填入表单；部分字段未识别，图片会作为产品参考素材使用，可手动补充后继续生成报告。"
+          : "已将图片识别结果自动填入表单，如有错误可直接手动修改。"
         : hasMissingFields
-          ? "部分字段未识别，可手动补充后重新生成报告。"
-          : "截图识别结果已返回，当前表单优先保留已填写内容。"
+          ? "未从图片中识别到完整商品信息，系统已将这些图片作为产品参考素材使用。请补充商品标题、类目、价格等基础信息后继续生成报告。"
+          : "图片识别结果已返回，当前表单优先保留已填写内容；图片将作为产品参考素材使用。"
     );
     setFormState(nextState);
   }, [recognizedFields, formState, priceMeta]);
@@ -313,7 +344,7 @@ export function ProductInputForm({
       <div className="space-y-1">
         <h2 className="text-lg font-semibold text-slate-950">商品信息</h2>
         <p className="text-sm leading-6 text-slate-500">
-          支持上传商品截图，系统会优先识别标题、价格、销量、评分等信息；识别不完整时可手动补充。
+          请上传产品相关图片，最多支持 10 张。图片越完整，AI 对产品结构、组合空间、配件关系、主图方向和标题卖点的判断越准确。
         </p>
       </div>
 
@@ -462,6 +493,41 @@ export function ProductInputForm({
             评论可选；如果不填写，系统不会编造用户痛点。
           </span>
         </label>
+
+        <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+          <div className="space-y-1">
+            <h3 className="text-sm font-semibold text-slate-900">产品规格信息</h3>
+            <p className="text-xs leading-5 text-slate-500">
+              规格信息越完整，AI 越容易生成准确的规格图和详情图。请不要填写不确定的数据。
+            </p>
+          </div>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className="text-xs font-medium text-slate-600">主产品规格</span>
+              <input value={formState.mainProductSpec} onChange={(event) => updateField("mainProductSpec", event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500" />
+            </label>
+            <label className="block">
+              <span className="text-xs font-medium text-slate-600">配件规格</span>
+              <input value={formState.accessorySpec} onChange={(event) => updateField("accessorySpec", event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500" />
+            </label>
+            <label className="block">
+              <span className="text-xs font-medium text-slate-600">产品尺寸</span>
+              <input value={formState.productSize} onChange={(event) => updateField("productSize", event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500" />
+            </label>
+            <label className="block">
+              <span className="text-xs font-medium text-slate-600">包装重量</span>
+              <input value={formState.packageWeight} onChange={(event) => updateField("packageWeight", event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500" />
+            </label>
+            <label className="block">
+              <span className="text-xs font-medium text-slate-600">包装尺寸</span>
+              <input value={formState.packageSize} onChange={(event) => updateField("packageSize", event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500" />
+            </label>
+            <label className="block">
+              <span className="text-xs font-medium text-slate-600">颜色/尺码选项</span>
+              <input value={formState.colorSizeOptions} onChange={(event) => updateField("colorSizeOptions", event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500" />
+            </label>
+          </div>
+        </div>
       </div>
 
       {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
@@ -476,6 +542,3 @@ export function ProductInputForm({
     </form>
   );
 }
-
-
-

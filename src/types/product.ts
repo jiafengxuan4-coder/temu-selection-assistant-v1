@@ -23,6 +23,15 @@ export type ProductPriceCandidate = {
   reason?: string;
 };
 
+export type ProductSpecsInput = {
+  mainProductSpec?: string;
+  accessorySpec?: string;
+  productSize?: string;
+  packageWeight?: string;
+  packageSize?: string;
+  colorSizeOptions?: string;
+};
+
 export type ProductInput = {
   imageFileName?: string;
   imageUrl?: string;
@@ -40,6 +49,7 @@ export type ProductInput = {
   monthlySales?: number;
   rating?: number;
   reviewsText?: string;
+  productSpecs?: ProductSpecsInput;
 };
 
 export type RecognizedProductFields = {
@@ -84,5 +94,3 @@ export type DataCompleteness = {
   missingFields: string[];
   confidenceImpact: "low" | "medium" | "high";
 };
-
-

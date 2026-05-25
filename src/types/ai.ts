@@ -1,10 +1,10 @@
-import type {
+﻿import type {
   ProductInput,
   ProductStructure,
   RecognizedProductFields,
   StandardizationLevel
 } from "@/types/product";
-import type { AnalysisReport } from "@/types/recommendation";
+import type { AnalysisReport, MaterialRequirement, PackagingLevel, PackagingProductType, PackagingWorth } from "@/types/recommendation";
 import type {
   ConfidenceLevel,
   HotProductFactorType,
@@ -37,7 +37,76 @@ export type AnalyzeProductResponse =
   | AnalyzeProductSuccessResponse
   | AnalyzeProductErrorResponse;
 
+export type AIPreGenerationRawOutput = {
+  productBasics?: {
+    productName?: string;
+    productCategory?: string;
+    currentComposition?: string;
+    mainUse?: string;
+    targetUsers?: string;
+    usageScenes?: string;
+  };
+  packagingValue?: {
+    worthPackaging?: PackagingWorth;
+    productType?: PackagingProductType;
+    priceComparisonRisk?: PackagingLevel;
+    transformationSpace?: PackagingLevel;
+    imageExpressionSpace?: PackagingLevel;
+    oneSentenceJudgment?: string;
+  };
+  planA?: {
+    combinationName?: string;
+    combinationContent?: string;
+    targetUsers?: string;
+    usageScene?: string;
+    coreSellingPoints?: string;
+    whyPriorityTest?: string;
+    suitableImageTypes?: string;
+  };
+  planB?: {
+    combinationName?: string;
+    combinationContent?: string;
+    targetUsers?: string;
+    usageScene?: string;
+    coreSellingPoints?: string;
+    whenToTry?: string;
+    notes?: string;
+  };
+  materialChecklist?: Array<{
+    materialType?: string;
+    requirement?: MaterialRequirement;
+    usage?: string;
+  }>;
+  imageGenerationPackage?: {
+    productName?: string;
+    productCategory?: string;
+    recommendedCombinationPlan?: string;
+    combinationContent?: string;
+    targetUsers?: string;
+    usageScene?: string;
+    coreSellingPoints?: string;
+    referenceImages?: string;
+    imageCount?: string;
+    imageRatio?: string;
+    imageStyle?: string;
+    restrictions?: string;
+    copyText?: string;
+  };
+  titleSellingPointPackage?: {
+    productName?: string;
+    productCategory?: string;
+    combinationPlan?: string;
+    productImages?: string;
+    targetPlatform?: string;
+    outputRequirements?: string[];
+    fixedRequirements?: string[];
+    copyText?: string;
+  };
+  boundaryReminder?: string;
+};
+
 export type AIAnalysisRawOutput = {
+  preGenerationReport?: AIPreGenerationRawOutput;
   imageRecognition?: {
     productType?: string;
     category?: string;

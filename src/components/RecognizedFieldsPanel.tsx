@@ -57,7 +57,7 @@ function formatCategorySource(source: RecognizedProductFields["categorySource"])
     case "manual":
       return "手动填写";
     case "recognized":
-      return "来自截图识别";
+      return "来自图片识别";
     case "inferred":
       return "根据商品标题推断";
     default:
@@ -85,7 +85,7 @@ function FieldRow({
       <p className="mt-1 text-sm font-medium text-slate-900">{formattedValue}</p>
       {detail ? <p className="mt-1 text-xs text-slate-500">{detail}</p> : null}
       <p className="mt-1 text-xs text-slate-500">
-        {formattedValue === "未识别" ? "未识别" : "来自截图识别"}
+        {formattedValue === "未识别" ? "未识别" : "来自图片识别"}
         {manualWins ? "；当前报告优先采用手动填写值" : ""}
       </p>
     </div>
@@ -106,9 +106,9 @@ export function RecognizedFieldsPanel({
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
       <div className="space-y-1">
-        <h2 className="text-lg font-semibold text-slate-950">AI 截图识别结果</h2>
+        <h2 className="text-lg font-semibold text-slate-950">AI 图片参考识别结果</h2>
         <p className="text-sm leading-6 text-slate-500">
-          以下信息由截图识别得到，建议生成报告前人工核对；手动填写字段会优先于识别结果。
+          以下信息由上传图片辅助识别得到；图片也会作为产品参考素材使用。手动填写字段会优先于识别结果。
         </p>
       </div>
 
@@ -117,7 +117,7 @@ export function RecognizedFieldsPanel({
           <div className="rounded-md bg-slate-50 p-3 sm:col-span-2">
             <p className="text-xs font-medium text-slate-500">综合识别截图数</p>
             <p className="mt-1 text-sm font-medium text-slate-900">{recognizedFields.imageCount} 张</p>
-            <p className="mt-1 text-xs text-slate-500">来自本次上传的商品截图</p>
+            <p className="mt-1 text-xs text-slate-500">来自本次上传的产品相关图片</p>
           </div>
         ) : null}
         <FieldRow label="商品标题" value={recognizedFields.title} manualValue={manualProduct?.title} />
@@ -143,7 +143,7 @@ export function RecognizedFieldsPanel({
         <div className="rounded-md bg-slate-50 p-3">
           <p className="text-xs font-medium text-slate-500">识别置信度</p>
           <p className="mt-1 text-sm font-medium text-slate-900">{confidenceLabelMap[confidence]}</p>
-          <p className="mt-1 text-xs text-slate-500">来自截图识别</p>
+          <p className="mt-1 text-xs text-slate-500">来自图片识别</p>
         </div>
       </div>
 
@@ -174,5 +174,3 @@ export function RecognizedFieldsPanel({
     </section>
   );
 }
-
-

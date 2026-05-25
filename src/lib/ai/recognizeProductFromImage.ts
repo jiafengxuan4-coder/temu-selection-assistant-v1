@@ -407,7 +407,7 @@ function fallbackRecognition(rawText = "", imageCount?: number): RecognizedProdu
   return {
     confidence: "unknown",
     missingFields: ["title", "category", "price"],
-    warnings: ["截图识别失败，建议手动填写商品信息后重新生成报告。"],
+    warnings: ["未从图片中识别到完整商品信息，系统已将这些图片作为产品参考素材使用。请补充商品标题、类目、价格等基础信息后继续生成报告。"],
     imageCount,
     rawText
   };
@@ -485,7 +485,7 @@ export async function recognizeProductFromImage({
 export async function recognizeProductFromImages(
   images: ProductImageInput[]
 ): Promise<RecognizedProductFields> {
-  const limitedImages = images.slice(0, 5);
+  const limitedImages = images.slice(0, 10);
 
   if (limitedImages.length === 0) {
     return fallbackRecognition("未提供商品截图", 0);
@@ -514,7 +514,7 @@ export async function recognizeProductFromImages(
       {
         role: "system",
         content:
-          "你是 TEMU 商品截图识别助手。你的任务是从同一个商品的 1-5 张截图中提取结构化商品信息。只做识别，不做选品判断，不做利润判断，不要编造截图中没有的信息。"
+          "你是 TEMU 商品图片参考识别助手。用户上传的可能是 TEMU 截图、产品素材图、配件图或 1688 图。你的任务是从同一个商品的 1-10 张图片中尽量提取结构化商品信息；如果提取不到标题、类目、价格等字段，不要视为严重错误，这些图片仍可作为产品结构和图文生成参考素材。只做识别，不做选品判断，不做利润判断，不要编造图片中没有的信息。"
       },
       {
         role: "user",
@@ -525,7 +525,7 @@ export async function recognizeProductFromImages(
 
     return parseRecognizedFields(response.text, limitedImages.length);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "截图识别失败";
+    const message = error instanceof Error ? error.message : "图片识别未得到完整商品信息";
     console.warn("[IMAGE_RECOGNITION_FALLBACK]", {
       errorType: "image_recognition",
       message
@@ -534,5 +534,3 @@ export async function recognizeProductFromImages(
     return fallbackRecognition(message, limitedImages.length);
   }
 }
-
-

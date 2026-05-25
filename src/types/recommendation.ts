@@ -1,4 +1,4 @@
-import type { ConfidenceLevel, HotProductAnalysis, ImageRecognitionResult, PriceComparisonRisk } from "./analysis";
+﻿import type { ConfidenceLevel, HotProductAnalysis, ImageRecognitionResult, PriceComparisonRisk } from "./analysis";
 import type { DataCompleteness, ProductInput } from "./product";
 
 export type RecommendationDirectionType =
@@ -39,6 +39,94 @@ export type RecommendationDirection = {
   level: RecommendationLevel;
 };
 
+export type PackagingWorth = "值得" | "待观察" | "不建议";
+export type PackagingProductType = "标品" | "半标品" | "非标品" | "混合型";
+export type PackagingLevel = "低" | "中" | "高";
+export type MaterialRequirement = "必须" | "必须，如果有组合配件" | "建议" | "建议，部分品类必须" | "可选";
+
+export type ProductBasicsReport = {
+  productName: string;
+  productCategory: string;
+  currentComposition: string;
+  mainUse: string;
+  targetUsers: string;
+  usageScenes: string;
+};
+
+export type PackagingValueReport = {
+  worthPackaging: PackagingWorth;
+  productType: PackagingProductType;
+  priceComparisonRisk: PackagingLevel;
+  transformationSpace: PackagingLevel;
+  imageExpressionSpace: PackagingLevel;
+  oneSentenceJudgment: string;
+};
+
+export type PrimaryCombinationPlan = {
+  combinationName: string;
+  combinationContent: string;
+  targetUsers: string;
+  usageScene: string;
+  coreSellingPoints: string;
+  whyPriorityTest: string;
+  suitableImageTypes: string;
+};
+
+export type BackupCombinationPlan = {
+  combinationName: string;
+  combinationContent: string;
+  targetUsers: string;
+  usageScene: string;
+  coreSellingPoints: string;
+  whenToTry: string;
+  notes: string;
+};
+
+export type MaterialChecklistItem = {
+  materialType: string;
+  requirement: MaterialRequirement;
+  usage: string;
+};
+
+export type ImageGenerationPackage = {
+  productName: string;
+  productCategory: string;
+  recommendedCombinationPlan: string;
+  combinationContent: string;
+  targetUsers: string;
+  usageScene: string;
+  coreSellingPoints: string;
+  referenceImages: string;
+  imageCount: string;
+  imageRatio: string;
+  imageStyle: string;
+  restrictions: string;
+  copyText: string;
+};
+
+export type TitleSellingPointPackage = {
+  productName: string;
+  productCategory: string;
+  combinationPlan: string;
+  productImages: string;
+  targetPlatform: string;
+  outputRequirements: string[];
+  fixedRequirements: string[];
+  copyText: string;
+};
+
+export type PreGenerationReport = {
+  productBasics: ProductBasicsReport;
+  packagingValue: PackagingValueReport;
+  planA: PrimaryCombinationPlan;
+  planB: BackupCombinationPlan;
+  priorityAdvice: string;
+  materialChecklist: MaterialChecklistItem[];
+  imageGenerationPackage: ImageGenerationPackage;
+  titleSellingPointPackage: TitleSellingPointPackage;
+  boundaryReminder: string;
+};
+
 export type AnalysisReport = {
   input: ProductInput;
   dataCompleteness: DataCompleteness;
@@ -48,4 +136,5 @@ export type AnalysisReport = {
   recommendations: RecommendationDirection[];
   finalConclusion: string;
   actionSuggestions: string[];
+  preGenerationReport: PreGenerationReport;
 };

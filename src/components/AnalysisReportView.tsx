@@ -1,13 +1,14 @@
+﻿"use client";
+
+import { useState } from "react";
 import { CopyReportButton } from "@/components/CopyReportButton";
 import { ExportMarkdownButton } from "@/components/ExportMarkdownButton";
-import { RecommendationCard } from "@/components/RecommendationCard";
+import {
+  formatImageGenerationPackage,
+  formatTitleSellingPointPackage,
+  type PackagePlanSelection
+} from "@/lib/reportFormatter";
 import type { ClientAnalysisSource } from "@/lib/clientAnalyze";
-import type {
-  ConfidenceLevel,
-  HotProductFactorType,
-  PriceComparisonRiskLevel
-} from "@/types/analysis";
-import type { ProductInput } from "@/types/product";
 import type { AnalysisReport } from "@/types/recommendation";
 
 type AnalysisReportViewProps = {
@@ -18,53 +19,48 @@ type AnalysisReportViewProps = {
   isAnalyzing?: boolean;
 };
 
-const factorLabelMap: Record<HotProductFactorType, string> = {
-  price: "价格因素",
-  color: "颜色因素",
-  style: "款式因素",
-  image_click_rate: "图片点击率因素",
-  comprehensive: "综合因素",
-  unknown: "未知因素"
+type CopyPackageButtonProps = {
+  label: string;
+  text: string;
 };
 
-const confidenceLabelMap: Record<ConfidenceLevel, string> = {
-  high: "高",
-  medium: "中",
-  low: "低",
-  unknown: "未知"
-};
+function CopyPackageButton({ label, text }: CopyPackageButtonProps) {
+  const [status, setStatus] = useState<"idle" | "copied" | "failed">("idle");
 
-const riskLevelLabelMap: Record<PriceComparisonRiskLevel, string> = {
-  low: "低风险",
-  medium: "中风险",
-  high: "高风险",
-  unknown: "未知"
-};
-
-function formatOptionalNumber(value: number | undefined): string {
-  return typeof value === "number" ? String(value) : "未提供";
-}
-
-function formatProductPrice(product: ProductInput): string {
-  return product.priceDisplay && product.priceDisplay.trim().length > 0
-    ? product.priceDisplay
-    : String(product.price);
-}
-
-function isPriceUncertain(product: ProductInput): boolean {
-  return product.priceSource === "uncertain";
-}
-
-function getStatusLabel(value: boolean): string {
-  return value ? "完整" : "缺失";
-}
-
-function getReadableWarning(warning: string): string {
-  if (warning.includes("核价")) {
-    return "该产品仍需经过平台核价验证。";
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setStatus("copied");
+      window.setTimeout(() => setStatus("idle"), 2000);
+    } catch {
+      setStatus("failed");
+      window.setTimeout(() => setStatus("idle"), 2000);
+    }
   }
 
-  return warning;
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+    >
+      {status === "copied" ? "已复制" : status === "failed" ? "复制失败" : label}
+    </button>
+  );
+}
+
+function formatProductPrice(report: AnalysisReport): string {
+  const priceDisplay = report.input.priceDisplay?.trim();
+  return priceDisplay && priceDisplay.length > 0 ? priceDisplay : String(report.input.price);
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md bg-slate-50 p-3">
+      <p className="text-xs text-slate-500">{label}</p>
+      <p className="mt-1 text-sm leading-6 text-slate-800">{value}</p>
+    </div>
+  );
 }
 
 export function AnalysisReportView({
@@ -74,16 +70,20 @@ export function AnalysisReportView({
   analysisMessage,
   isAnalyzing = false
 }: AnalysisReportViewProps) {
-  const hasNoSales = !report.dataCompleteness.hasWeeklySales && !report.dataCompleteness.hasMonthlySales;
-  const isHighRisk = report.directCopyRisk.riskLevel === "high";
+  const pre = report.preGenerationReport;
+  const [selectedPackagePlan, setSelectedPackagePlan] = useState<PackagePlanSelection>("A");
+  const imagePackageText = formatImageGenerationPackage(report, selectedPackagePlan);
+  const titlePackageText = formatTitleSellingPointPackage(report, selectedPackagePlan);
 
   return (
     <div className="space-y-5">
       <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-slate-950">结构化选品报告</h2>
-            <p className="mt-1 text-sm text-slate-500">可复制为中文纯文本，方便发给学员、运营同事或客户。</p>
+            <h2 className="text-xl font-semibold text-slate-950">TEMU AI 图文生成前置报告</h2>
+            <p className="mt-1 text-sm leading-6 text-slate-500">
+              根据产品信息，自动生成组合方案、1688 素材清单、ChatGPT 生图资料包和标题卖点资料包。
+            </p>
             {analysisSource ? (
               <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm leading-6 text-slate-700">
                 <p>
@@ -113,174 +113,151 @@ export function AnalysisReportView({
             ) : null}
           </div>
         </div>
-        <div className="mt-4 grid gap-3 text-sm leading-6 text-slate-700 sm:grid-cols-2">
-          <p><strong className="text-slate-950">商品标题：</strong>{report.input.title}</p>
-          <p><strong className="text-slate-950">商品类目：</strong>{report.input.category}</p>
-          <p>
-            <strong className="text-slate-950">商品价格：</strong>
-            {formatProductPrice(report.input)}
-            {isPriceUncertain(report.input) ? (
-              <span className="ml-2 text-xs text-amber-700">价格识别不确定，建议人工核对。</span>
-            ) : null}
-          </p>
-          <p><strong className="text-slate-950">周销量：</strong>{formatOptionalNumber(report.input.weeklySales)}</p>
-          <p><strong className="text-slate-950">月销量：</strong>{formatOptionalNumber(report.input.monthlySales)}</p>
-          <p><strong className="text-slate-950">商品评分：</strong>{formatOptionalNumber(report.input.rating)}</p>
-        </div>
       </section>
 
       <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-          <h2 className="text-lg font-semibold text-slate-950">数据完整度</h2>
-          <p className="text-sm text-slate-500">数据越完整，报告越准确。</p>
-        </div>
-
-        <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-          <div className="rounded-md bg-slate-50 p-3">
-            <p className="font-medium text-slate-950">必填数据</p>
-            <p className="mt-1 text-slate-600">
-              标题：{getStatusLabel(report.dataCompleteness.hasTitle)} / 类目：{getStatusLabel(report.dataCompleteness.hasCategory)} / 价格：{getStatusLabel(report.dataCompleteness.hasPrice)}
-            </p>
-          </div>
-          <div className="rounded-md bg-slate-50 p-3">
-            <p className="font-medium text-slate-950">选填数据</p>
-            <p className="mt-1 text-slate-600">
-              周销量：{getStatusLabel(report.dataCompleteness.hasWeeklySales)} / 月销量：{getStatusLabel(report.dataCompleteness.hasMonthlySales)} / 评分：{getStatusLabel(report.dataCompleteness.hasRating)} / 评论：{getStatusLabel(report.dataCompleteness.hasReviews)}
-            </p>
-          </div>
-        </div>
-
-        <ul className="mt-4 list-disc space-y-1 pl-5 text-sm leading-6 text-slate-600">
-          {hasNoSales ? <li>缺少销量数据，销售潜力判断置信度降低。</li> : null}
-          {!report.dataCompleteness.hasRating ? <li>缺少评分数据，无法判断用户满意度。</li> : null}
-          {!report.dataCompleteness.hasReviews ? <li>缺少评论内容，本次不会分析用户真实反馈痛点。</li> : null}
-          {report.dataCompleteness.missingFields
-            .filter((field) => !field.includes("周销量") && !field.includes("月销量") && !field.includes("评分") && !field.includes("评论"))
-            .map((field) => (
-              <li key={field}>{field}</li>
-            ))}
-        </ul>
-      </section>
-
-      {report.imageRecognition ? (
-        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-lg font-semibold text-slate-950">模拟图片识别结果</h2>
-            <span className="w-fit rounded-md bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
-              MVP 模拟
-            </span>
-          </div>
-          <p className="mt-3 text-sm leading-6 text-slate-600">
-            当前结果由标题和类目模拟生成，不代表真实图片识别。接入 AI 识图后，该部分将由图片自动分析得到。
-          </p>
-          <div className="mt-4 grid gap-3 text-sm leading-6 text-slate-700 sm:grid-cols-2">
-            <p><strong className="text-slate-950">产品类型：</strong>{report.imageRecognition.productType}</p>
-            <p><strong className="text-slate-950">类目：</strong>{report.imageRecognition.category}</p>
-            <p><strong className="text-slate-950">主色：</strong>{report.imageRecognition.mainColors.join("、")}</p>
-            <p><strong className="text-slate-950">产品结构：</strong>{report.imageRecognition.productStructure}</p>
-            <p><strong className="text-slate-950">标准化程度：</strong>{report.imageRecognition.standardizationLevel}</p>
-            <p><strong className="text-slate-950">使用场景：</strong>{report.imageRecognition.usageScenes.join("、")}</p>
-            <p><strong className="text-slate-950">目标人群：</strong>{report.imageRecognition.targetUsers.join("、")}</p>
-            <p><strong className="text-slate-950">图片点击潜力因素：</strong>{report.imageRecognition.clickPotentialFactors.join("、")}</p>
-          </div>
-        </section>
-      ) : null}
-
-      <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-          <h2 className="text-lg font-semibold text-slate-950">疑似爆款因素</h2>
-          <p className="text-sm text-slate-500">系统只输出疑似因素，不强行判断确定原因。</p>
-        </div>
-        <div className="mt-4 space-y-3">
-          {report.hotProductAnalysis.possibleWinningFactors.map((factor) => (
-            <div key={`${factor.factor}-${factor.reason}`} className="rounded-md bg-slate-50 p-3 text-sm leading-6 text-slate-700">
-              <p className="font-medium text-slate-950">
-                {factorLabelMap[factor.factor]} · 置信度：{confidenceLabelMap[factor.confidence]}
-              </p>
-              <p className="mt-1">{factor.reason}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="text-lg font-semibold text-slate-950">直接跟款风险</h2>
-        {isHighRisk ? (
-          <div className="mt-3 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm font-medium text-rose-800">
-            直接跟款风险较高，不建议只改标题、图片或描述后上架。
-          </div>
-        ) : null}
+        <h3 className="text-lg font-semibold text-slate-950">一、产品基础识别</h3>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <div className="rounded-md bg-slate-50 p-3">
-            <p className="text-xs text-slate-500">风险等级</p>
-            <p className="mt-1 text-lg font-semibold text-slate-950">
-              {riskLevelLabelMap[report.directCopyRisk.riskLevel]}
-            </p>
+          <InfoRow label="产品名称" value={pre.productBasics.productName} />
+          <InfoRow label="产品类目" value={pre.productBasics.productCategory} />
+          <InfoRow label="商品价格" value={formatProductPrice(report)} />
+          <InfoRow label="当前产品组成" value={pre.productBasics.currentComposition} />
+          <InfoRow label="产品主要用途" value={pre.productBasics.mainUse} />
+          <InfoRow label="适合人群" value={pre.productBasics.targetUsers} />
+          <InfoRow label="主要使用场景" value={pre.productBasics.usageScenes} />
+        </div>
+      </section>
+
+      <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <h3 className="text-lg font-semibold text-slate-950">二、产品包装价值判断</h3>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <InfoRow label="是否值得继续包装" value={pre.packagingValue.worthPackaging} />
+          <InfoRow label="产品类型" value={pre.packagingValue.productType} />
+          <InfoRow label="比价风险" value={pre.packagingValue.priceComparisonRisk} />
+          <InfoRow label="可变形空间" value={pre.packagingValue.transformationSpace} />
+          <InfoRow label="图片表达空间" value={pre.packagingValue.imageExpressionSpace} />
+          <InfoRow label="一句话判断" value={pre.packagingValue.oneSentenceJudgment} />
+        </div>
+      </section>
+
+      <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <h3 className="text-lg font-semibold text-slate-950">三、推荐组合方案</h3>
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+            <p className="text-sm font-semibold text-emerald-900">方案 A：优先测试方案</p>
+            <div className="mt-3 space-y-2 text-sm leading-6 text-slate-700">
+              <p><strong>组合名称：</strong>{pre.planA.combinationName}</p>
+              <p><strong>组合内容：</strong>{pre.planA.combinationContent}</p>
+              <p><strong>目标人群：</strong>{pre.planA.targetUsers}</p>
+              <p><strong>使用场景：</strong>{pre.planA.usageScene}</p>
+              <p><strong>核心卖点：</strong>{pre.planA.coreSellingPoints}</p>
+              <p><strong>为什么适合优先测试：</strong>{pre.planA.whyPriorityTest}</p>
+              <p><strong>适合生成什么类型图片：</strong>{pre.planA.suitableImageTypes}</p>
+            </div>
           </div>
-          <div className="rounded-md bg-slate-50 p-3">
-            <p className="text-xs text-slate-500">风险分</p>
-            <p className="mt-1 text-lg font-semibold text-slate-950">{report.directCopyRisk.riskScore}</p>
+
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <p className="text-sm font-semibold text-slate-950">方案 B：备选升级方案</p>
+            <div className="mt-3 space-y-2 text-sm leading-6 text-slate-700">
+              <p><strong>组合名称：</strong>{pre.planB.combinationName}</p>
+              <p><strong>组合内容：</strong>{pre.planB.combinationContent}</p>
+              <p><strong>目标人群：</strong>{pre.planB.targetUsers}</p>
+              <p><strong>使用场景：</strong>{pre.planB.usageScene}</p>
+              <p><strong>核心卖点：</strong>{pre.planB.coreSellingPoints}</p>
+              <p><strong>适合什么时候尝试：</strong>{pre.planB.whenToTry}</p>
+              <p><strong>需要注意什么：</strong>{pre.planB.notes}</p>
+            </div>
           </div>
         </div>
+        <p className="mt-4 rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white">
+          {pre.priorityAdvice}
+        </p>
+        <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
+          <p className="text-sm font-semibold text-slate-950">选择后续用于 ChatGPT 生成的方案</p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <label className="flex cursor-pointer items-start gap-2 rounded-md border border-slate-200 p-3 text-sm text-slate-700 hover:bg-slate-50">
+              <input
+                type="radio"
+                name="package-plan"
+                value="A"
+                checked={selectedPackagePlan === "A"}
+                onChange={() => setSelectedPackagePlan("A")}
+                className="mt-1"
+              />
+              <span>
+                <span className="block font-medium text-slate-950">方案 A：优先测试方案（推荐）</span>
+                <span className="mt-1 block text-xs leading-5 text-slate-500">
+                  下方生图资料包和标题卖点资料包默认使用方案 A。
+                </span>
+              </span>
+            </label>
+            <label className="flex cursor-pointer items-start gap-2 rounded-md border border-slate-200 p-3 text-sm text-slate-700 hover:bg-slate-50">
+              <input
+                type="radio"
+                name="package-plan"
+                value="B"
+                checked={selectedPackagePlan === "B"}
+                onChange={() => setSelectedPackagePlan("B")}
+                className="mt-1"
+              />
+              <span>
+                <span className="block font-medium text-slate-950">方案 B：备选升级方案</span>
+                <span className="mt-1 block text-xs leading-5 text-slate-500">
+                  选择后，下方两个资料包会切换为方案 B 内容。
+                </span>
+              </span>
+            </label>
+          </div>
+        </div>
+      </section>
 
-        <div className="mt-4 grid gap-4 text-sm leading-6 text-slate-600 lg:grid-cols-3">
-          <div>
-            <h3 className="font-semibold text-slate-950">风险原因</h3>
-            <ul className="mt-2 list-disc space-y-1 pl-5">
-              {report.directCopyRisk.reasons.map((reason) => (
-                <li key={reason}>{reason}</li>
+      <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <h3 className="text-lg font-semibold text-slate-950">四、1688 素材准备清单</h3>
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full min-w-[520px] border-collapse text-left text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
+                <th className="px-3 py-2 font-medium">素材类型</th>
+                <th className="px-3 py-2 font-medium">是否必须</th>
+                <th className="px-3 py-2 font-medium">用途</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pre.materialChecklist.map((item) => (
+                <tr key={`${item.materialType}-${item.usage}`} className="border-b border-slate-100">
+                  <td className="px-3 py-2 text-slate-900">{item.materialType}</td>
+                  <td className="px-3 py-2 text-slate-700">{item.requirement}</td>
+                  <td className="px-3 py-2 text-slate-700">{item.usage}</td>
+                </tr>
               ))}
-            </ul>
-          </div>
-          <div>
-            <h3 className="font-semibold text-slate-950">风险警告</h3>
-            <ul className="mt-2 list-disc space-y-1 pl-5">
-              {report.directCopyRisk.riskWarnings.length > 0 ? (
-                report.directCopyRisk.riskWarnings.map((warning) => (
-                  <li key={warning}>{getReadableWarning(warning)}</li>
-                ))
-              ) : (
-                <li>当前未出现明显高风险警告，仍建议核对同款情况。</li>
-              )}
-            </ul>
-          </div>
-          <div>
-            <h3 className="font-semibold text-slate-950">降低风险建议</h3>
-            <ul className="mt-2 list-disc space-y-1 pl-5">
-              {report.directCopyRisk.riskReductionSuggestions.length > 0 ? (
-                report.directCopyRisk.riskReductionSuggestions.map((suggestion) => (
-                  <li key={suggestion}>{suggestion}</li>
-                ))
-              ) : (
-                <li>保留组合、升级、场景或人群细分等差异化方向。</li>
-              )}
-            </ul>
-          </div>
+            </tbody>
+          </table>
         </div>
       </section>
 
-      <section className="space-y-4">
-        <div>
-          <h2 className="text-lg font-semibold text-slate-950">差异化推荐方向</h2>
-          <p className="mt-1 text-sm text-slate-500">默认展示 3 个可测试方向，按当前综合推荐分和规则优先级排序。</p>
+      <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h3 className="text-lg font-semibold text-slate-950">五、复制给 ChatGPT 的生图资料包</h3>
+          <CopyPackageButton label="复制生图资料包" text={imagePackageText} />
         </div>
-        {report.recommendations.map((recommendation) => (
-          <RecommendationCard key={recommendation.id} recommendation={recommendation} />
-        ))}
+        <pre className="mt-4 max-h-80 overflow-auto whitespace-pre-wrap rounded-md bg-slate-950 p-4 text-xs leading-6 text-slate-50">
+          {imagePackageText}
+        </pre>
       </section>
 
       <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="text-lg font-semibold text-slate-950">最终结论</h2>
-        <p className="mt-3 text-sm leading-6 text-slate-700">{report.finalConclusion}</p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h3 className="text-lg font-semibold text-slate-950">六、复制给 ChatGPT 的标题卖点资料包</h3>
+          <CopyPackageButton label="复制标题卖点资料包" text={titlePackageText} />
+        </div>
+        <pre className="mt-4 max-h-80 overflow-auto whitespace-pre-wrap rounded-md bg-slate-950 p-4 text-xs leading-6 text-slate-50">
+          {titlePackageText}
+        </pre>
       </section>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="text-lg font-semibold text-slate-950">操作建议</h2>
-        <ul className="mt-3 list-disc space-y-1 pl-5 text-sm leading-6 text-slate-600">
-          {report.actionSuggestions.map((suggestion) => (
-            <li key={suggestion}>{suggestion}</li>
-          ))}
-        </ul>
+      <section className="rounded-lg border border-amber-200 bg-amber-50 p-5 shadow-sm">
+        <h3 className="text-lg font-semibold text-amber-950">七、边界提醒</h3>
+        <p className="mt-3 text-sm leading-6 text-amber-900">{pre.boundaryReminder}</p>
       </section>
     </div>
   );

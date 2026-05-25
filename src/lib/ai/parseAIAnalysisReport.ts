@@ -1,4 +1,5 @@
-import type { AIAnalysisRawOutput } from "@/types/ai";
+﻿import { validateAndPolishAIReport } from "@/lib/ai/validateAIReport";
+import type { AIAnalysisRawOutput, AIPreGenerationRawOutput } from "@/types/ai";
 import type {
   ConfidenceLevel,
   HotProductFactorType,
@@ -12,10 +13,20 @@ import type {
 } from "@/types/product";
 import type {
   AnalysisReport,
+  BackupCombinationPlan,
+  ImageGenerationPackage,
+  MaterialChecklistItem,
+  PackagingLevel,
+  PackagingProductType,
+  PackagingValueReport,
+  PackagingWorth,
+  PreGenerationReport,
+  PrimaryCombinationPlan,
+  ProductBasicsReport,
   RecommendationDirectionType,
-  RecommendationLevel
+  RecommendationLevel,
+  TitleSellingPointPackage
 } from "@/types/recommendation";
-import { validateAndPolishAIReport } from "@/lib/ai/validateAIReport";
 
 type ParseAIAnalysisReportParams = {
   product: ProductInput;
@@ -23,38 +34,18 @@ type ParseAIAnalysisReportParams = {
 };
 
 const confidenceLevels = ["low", "medium", "high", "unknown"] as const;
-const hotProductFactorTypes = [
-  "price",
-  "color",
-  "style",
-  "image_click_rate",
-  "comprehensive",
-  "unknown"
-] as const;
+const hotProductFactorTypes = ["price", "color", "style", "image_click_rate", "comprehensive", "unknown"] as const;
 const productStructures = ["single", "bundle", "multi_pack", "unknown"] as const;
-const standardizationLevels = [
-  "standard",
-  "semi_standard",
-  "non_standard",
-  "unknown"
-] as const;
+const standardizationLevels = ["standard", "semi_standard", "non_standard", "unknown"] as const;
 const riskLevels = ["low", "medium", "high", "unknown"] as const;
-const recommendationTypes = [
-  "bundle",
-  "upgrade",
-  "scene_segment",
-  "user_segment",
-  "function_difference",
-  "review_pain_point",
-  "image_expression",
-  "cautious"
-] as const;
-const recommendationLevels = [
-  "priority_test",
-  "small_batch_test",
-  "cautious",
-  "not_recommended"
-] as const;
+const recommendationTypes = ["bundle", "upgrade", "scene_segment", "user_segment", "function_difference", "review_pain_point", "image_expression", "cautious"] as const;
+const recommendationLevels = ["priority_test", "small_batch_test", "cautious", "not_recommended"] as const;
+const packagingWorthValues = ["值得", "待观察", "不建议"] as const;
+const packagingProductTypeValues = ["标品", "半标品", "非标品", "混合型"] as const;
+const packagingLevelValues = ["低", "中", "高"] as const;
+const materialRequirementValues = ["必须", "必须，如果有组合配件", "建议", "建议，部分品类必须", "可选"] as const;
+
+const boundaryReminder = "本报告只提供产品包装方向、组合建议、素材准备和 AI 图文生成资料，不代表最终上架建议。供货能力、真实成本、物流费用和利润结果，请卖家自行确认。";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -93,25 +84,18 @@ function parseRawOutput(rawText: string): AIAnalysisRawOutput {
 
 function sanitizeText(value: string): string {
   return value
-    .replace(/一定能通过核价/g, "不代表可以通过核价")
-    .replace(/一定能爆/g, "不代表具备爆款结果")
+    .replace(/一定能通过核价/g, "不代表一定通过核价")
+    .replace(/一定能爆/g, "需要进一步验证")
     .replace(/保证能卖/g, "不承诺销售结果")
     .replace(/保证通过/g, "不承诺通过")
-    .replace(/百分百/g, "高确定性")
+    .replace(/百分百/g, "需要进一步验证")
     .replace(/必然爆/g, "可能有机会")
     .replace(/必爆/g, "可能有机会")
-    .replace(/必过/g, "可能通过")
+    .replace(/必过/g, "不代表一定通过")
     .replace(/必然/g, "可能")
-    .replace(/绝对/g, "明显")
-    .replace(/保证/g, "承诺")
+    .replace(/绝对/g, "相对")
+    .replace(/保证/g, "建议验证")
     .replace(/一定/g, "可能");
-}
-
-function hasEnglishHeavyText(value: string): boolean {
-  const englishMatches = value.match(/[A-Za-z]{4,}/g) ?? [];
-  const chineseMatches = value.match(/[\u4e00-\u9fa5]/g) ?? [];
-
-  return englishMatches.length >= 6 && englishMatches.length > chineseMatches.length / 3;
 }
 
 function pickString(value: unknown, fallback: string): string {
@@ -134,33 +118,48 @@ function clampScore(value: unknown, fallback: number): number {
   return Math.min(100, Math.max(0, Math.round(pickNumber(value, fallback))));
 }
 
-function pickEnum<T extends readonly string[]>(
-  value: unknown,
-  allowedValues: T,
-  fallback: T[number]
-): T[number] {
-  return typeof value === "string" && (allowedValues as readonly string[]).includes(value)
-    ? value
-    : fallback;
+function pickEnum<T extends readonly string[]>(value: unknown, allowedValues: T, fallback: T[number]): T[number] {
+  return typeof value === "string" && (allowedValues as readonly string[]).includes(value) ? value : fallback;
+}
+
+function formatProductName(product: ProductInput): string {
+  return product.title.trim() || "待补充产品名称";
+}
+
+function formatProductCategory(product: ProductInput): string {
+  return product.category.trim() || "待补充类目";
+}
+
+function formatSpecsLines(product: ProductInput): string[] {
+  const specs = product.productSpecs ?? {};
+  return [
+    `主产品规格：${specs.mainProductSpec ?? "未提供"}`,
+    `配件规格：${specs.accessorySpec ?? "未提供"}`,
+    `产品尺寸：${specs.productSize ?? "未提供"}`,
+    `包装重量：${specs.packageWeight ?? "未提供"}`,
+    `包装尺寸：${specs.packageSize ?? "未提供"}`,
+    `颜色/尺码选项：${specs.colorSizeOptions ?? "未提供"}`
+  ];
+}
+function createCopyText(lines: string[]): string {
+  return lines.join("\n");
 }
 
 function createDataCompleteness(product: ProductInput): DataCompleteness {
-  const hasImage = Boolean(product.imageFileName || product.imageUrl);
+  const hasImage = Boolean(product.imageFileName || product.imageUrl || product.images?.length);
   const hasWeeklySales = typeof product.weeklySales === "number";
   const hasMonthlySales = typeof product.monthlySales === "number";
   const hasRating = typeof product.rating === "number";
   const hasReviews = Boolean(product.reviewsText?.trim());
   const missingFields: string[] = [];
 
-  if (!hasImage) missingFields.push("爆款图片");
+  if (!hasImage) missingFields.push("产品图片");
   if (!hasWeeklySales) missingFields.push("周销量");
   if (!hasMonthlySales) missingFields.push("月销量");
   if (!hasRating) missingFields.push("商品评分");
   if (!hasReviews) missingFields.push("评论内容");
 
-  const optionalMissingCount = [hasWeeklySales, hasMonthlySales, hasRating, hasReviews].filter(
-    (item) => !item
-  ).length;
+  const optionalMissingCount = [hasWeeklySales, hasMonthlySales, hasRating, hasReviews].filter((item) => !item).length;
 
   return {
     hasImage,
@@ -183,16 +182,8 @@ function mapImageRecognition(raw: AIAnalysisRawOutput["imageRecognition"], produ
     mainColors: pickStringArray(raw?.mainColors),
     secondaryColors: pickStringArray(raw?.secondaryColors),
     styleDescription: pickString(raw?.styleDescription, "unknown"),
-    productStructure: pickEnum(
-      raw?.productStructure,
-      productStructures,
-      "unknown"
-    ) as ProductStructure,
-    standardizationLevel: pickEnum(
-      raw?.standardizationLevel,
-      standardizationLevels,
-      "unknown"
-    ) as StandardizationLevel,
+    productStructure: pickEnum(raw?.productStructure, productStructures, "unknown") as ProductStructure,
+    standardizationLevel: pickEnum(raw?.standardizationLevel, standardizationLevels, "unknown") as StandardizationLevel,
     visibleAccessories: pickStringArray(raw?.visibleAccessories),
     usageScenes: pickStringArray(raw?.usageScenes),
     targetUsers: pickStringArray(raw?.targetUsers),
@@ -200,24 +191,14 @@ function mapImageRecognition(raw: AIAnalysisRawOutput["imageRecognition"], produ
     clickPotentialFactors: pickStringArray(raw?.clickPotentialFactors),
     sellingPointElements: pickStringArray(raw?.sellingPointElements),
     unknownFields: pickStringArray(raw?.unknownFields),
-    warnings: [
-      {
-        code: "AI_TEXT_ONLY_ANALYSIS",
-        message: "当前接口未接入真实图片上传，本次图片识别结果主要基于商品信息生成。",
-        severity: "low" as const
-      }
-    ],
+    warnings: [],
     confidence: "medium" as ConfidenceLevel
   };
 }
 
 function mapHotProductAnalysis(raw: AIAnalysisRawOutput["hotProductAnalysis"]) {
   return {
-    hotProductType: pickEnum(
-      raw?.hotProductType,
-      hotProductFactorTypes,
-      "unknown"
-    ) as HotProductFactorType,
+    hotProductType: pickEnum(raw?.hotProductType, hotProductFactorTypes, "unknown") as HotProductFactorType,
     possibleWinningFactors: Array.isArray(raw?.possibleWinningFactors)
       ? raw.possibleWinningFactors.map((factor) => ({
           factor: pickEnum(factor?.factor, hotProductFactorTypes, "unknown") as HotProductFactorType,
@@ -249,105 +230,253 @@ function mapRecommendations(raw: AIAnalysisRawOutput["recommendations"]) {
 
     return {
       id: `ai-recommendation-${index + 1}`,
-      type: pickEnum(
-        recommendation.type,
-        recommendationTypes,
-        "cautious"
-      ) as RecommendationDirectionType,
-      title: pickString(recommendation.title, `差异化推荐方向 ${index + 1}`),
+      type: pickEnum(recommendation.type, recommendationTypes, "cautious") as RecommendationDirectionType,
+      title: pickString(recommendation.title, `差异化方向 ${index + 1}`),
       productIdea: pickString(recommendation.productIdea, "建议补充更多商品信息后再细化方案。"),
       reason: pickString(recommendation.reason, "当前方向需要进一步验证。"),
       relatedWinningFactors: pickStringArray(recommendation.relatedWinningFactors),
-      howItReducesPriceComparisonRisk: pickString(
-        recommendation.howItReducesPriceComparisonRisk,
-        "通过差异化组合、升级或场景变化，有助于相对降低直接同款比价风险。"
-      ),
-      whyItStillHasSalesPotential: pickString(
-        recommendation.whyItStillHasSalesPotential,
-        "该方向保留了原产品的部分需求逻辑，但仍需测试验证。"
-      ),
+      howItReducesPriceComparisonRisk: pickString(recommendation.howItReducesPriceComparisonRisk, "通过组合、升级或场景变化，有助于相对降低直接同款比价风险。"),
+      whyItStillHasSalesPotential: pickString(recommendation.whyItStillHasSalesPotential, "该方向保留了原产品的部分需求逻辑，但仍需测试验证。"),
       potentialRisks: pickStringArray(recommendation.potentialRisks),
       score: {
         salesPotentialScore,
         priceApprovalScore,
         finalRecommendationScore,
         confidence: "medium" as ConfidenceLevel,
-        scoreReasons: [
-          "分数来自 AI 结构化输出，已限制在 0-100 范围内。",
-          "上架前仍需结合供应链、同款情况和实际核价结果进一步判断。"
-        ]
+        scoreReasons: ["分数来自 AI 结构化输出，已限制在 0-100 范围内。"]
       },
-      level: pickEnum(
-        recommendation.level,
-        recommendationLevels,
-        "small_batch_test"
-      ) as RecommendationLevel
+      level: pickEnum(recommendation.level, recommendationLevels, "small_batch_test") as RecommendationLevel
     };
   });
 }
 
-function mapActionSuggestions(raw: unknown): string[] {
-  const suggestions = pickStringArray(raw);
-  const requiredSuggestions = [
-    "不建议直接复制同款。",
-    "优先选择组合、升级、场景细分等差异化方向。",
-    "上架前仍需核对 1688 同款情况。",
-    "如果缺少评论和销量，建议补充数据后重新分析。",
-    "上架前建议小批量测试，不要一次性大量铺货。"
+function mapMaterialChecklist(raw: AIPreGenerationRawOutput["materialChecklist"]): MaterialChecklistItem[] {
+  const fallback: MaterialChecklistItem[] = [
+    { materialType: "主产品图", requirement: "必须", usage: "用于生成套装主图。" },
+    { materialType: "配件图", requirement: "必须，如果有组合配件", usage: "用于展示组合内容和套装价值。" },
+    { materialType: "产品细节图", requirement: "建议", usage: "用于展示扣具、结构、细节、做工等。" },
+    { materialType: "规格/尺码图", requirement: "建议，部分品类必须", usage: "用于生成规格图、尺寸图、尺码说明图。" },
+    { materialType: "包装/重量信息截图", requirement: "建议", usage: "用于辅助核价和规格表达。" },
+    { materialType: "颜色/款式图", requirement: "可选", usage: "用于展示可选颜色、款式或尺码。" }
   ];
 
-  for (const suggestion of requiredSuggestions) {
-    if (!suggestions.some((item) => item.includes(suggestion.replace("。", "")))) {
-      suggestions.push(suggestion);
-    }
-  }
+  if (!Array.isArray(raw) || raw.length === 0) return fallback;
 
-  return suggestions;
+  return raw.slice(0, 6).map((item, index) => ({
+    materialType: pickString(item.materialType, fallback[index]?.materialType ?? "参考素材"),
+    requirement: pickEnum(item.requirement, materialRequirementValues, fallback[index]?.requirement ?? "建议"),
+    usage: pickString(item.usage, fallback[index]?.usage ?? "用于辅助生成图文资料。")
+  }));
 }
 
-function hasEnglishHeavyReport(raw: AIAnalysisRawOutput): boolean {
-  const textBlocks = [
-    raw.finalConclusion,
-    ...(raw.actionSuggestions ?? []),
-    ...(raw.directCopyRisk?.reasons ?? []),
-    ...(raw.directCopyRisk?.riskWarnings ?? []),
-    ...(raw.directCopyRisk?.riskReductionSuggestions ?? []),
-    ...(raw.hotProductAnalysis?.unknownFactors ?? []),
-    ...(raw.hotProductAnalysis?.notes ?? []),
-    ...(raw.hotProductAnalysis?.possibleWinningFactors ?? []).map((item) => item.reason),
-    ...(raw.recommendations ?? []).flatMap((item) => [
-      item.title,
-      item.productIdea,
-      item.reason,
-      item.howItReducesPriceComparisonRisk,
-      item.whyItStillHasSalesPotential,
-      ...(item.relatedWinningFactors ?? []),
-      ...(item.potentialRisks ?? [])
-    ])
-  ];
-
-  return textBlocks.some((item) => typeof item === "string" && hasEnglishHeavyText(item));
+function buildImagePackageCopyText(pkg: Omit<ImageGenerationPackage, "copyText">, product?: ProductInput): string {
+  return createCopyText([
+    "请根据以下资料生成 TEMU 商品图：",
+    `产品名称：${pkg.productName}`,
+    `产品类目：${pkg.productCategory}`,
+    `推荐组合方案：${pkg.recommendedCombinationPlan}`,
+    `组合内容：${pkg.combinationContent}`,
+    `目标人群：${pkg.targetUsers}`,
+    `使用场景：${pkg.usageScene}`,
+    `核心卖点：${pkg.coreSellingPoints}`,
+    `参考图片：${pkg.referenceImages}`,
+    `生成图片数量：${pkg.imageCount}`,
+    `图片比例：${pkg.imageRatio}`,
+    `图片风格：${pkg.imageStyle}`,
+    "规格信息：",
+    ...(product ? formatSpecsLines(product) : ["主产品规格：未提供", "配件规格：未提供", "产品尺寸：未提供", "包装重量：未提供", "包装尺寸：未提供", "颜色/尺码选项：未提供"]),
+    `禁止事项：${pkg.restrictions}`,
+    "固定要求：如果有规格信息，请生成一张规格/尺码说明图；如果规格信息不完整，不要编造尺寸、重量、材质、承重或认证数据。",
+    "第 5 张图建议为规格/细节图，优先展示规格、尺寸、尺码、配件清单；如果规格信息不足，则只展示真实可见的产品细节，不要编造数据。"
+  ]);
 }
 
-export function parseAIAnalysisReport({
-  product,
-  rawText
-}: ParseAIAnalysisReportParams): AnalysisReport {
+function buildTitlePackageCopyText(pkg: Omit<TitleSellingPointPackage, "copyText">): string {
+  return createCopyText([
+    "请根据以下资料生成 TEMU 商品标题和卖点：",
+    `产品名称：${pkg.productName}`,
+    `产品类目：${pkg.productCategory}`,
+    `组合方案：${pkg.combinationPlan}`,
+    `产品图片 / AI 生成图：${pkg.productImages}`,
+    `目标平台：${pkg.targetPlatform}`,
+    "输出要求：",
+    ...pkg.outputRequirements.map((item) => `- ${item}`),
+    "固定要求：",
+    ...pkg.fixedRequirements.map((item) => `- ${item}`)
+  ]);
+}
+
+function createDefaultPreGenerationReport(product: ProductInput): PreGenerationReport {
+  const productName = formatProductName(product);
+  const productCategory = formatProductCategory(product);
+  const planA: PrimaryCombinationPlan = {
+    combinationName: `${productName} 场景组合优先测试方案`,
+    combinationContent: "主产品 + 相关配件 + 场景化使用补充件",
+    targetUsers: "对该产品已有明确需求的人群",
+    usageScene: "日常使用、礼物场景或平台主图可表达的核心使用场景",
+    coreSellingPoints: "围绕组合价值、使用便利性和场景完整度表达，不夸大产品功能。",
+    whyPriorityTest: "该方案不是直接复制单品，而是通过组合内容提高素材表达空间，适合作为第一轮小批量测试方向。",
+    suitableImageTypes: "组合平铺图、使用场景图、配件关系图、卖点聚焦图、主图风格图"
+  };
+  const planB: BackupCombinationPlan = {
+    combinationName: `${productName} 升级备选方案`,
+    combinationContent: "主产品 + 规格/颜色/配件升级方向",
+    targetUsers: "愿意为更完整使用体验付费的用户",
+    usageScene: "需要更清晰卖点或更强场景表达的使用场景",
+    coreSellingPoints: "突出升级点和使用场景，但不写未经确认的认证、材质、承重、尺寸或数据。",
+    whenToTry: "当方案 A 素材不足、供应链不稳定或测试反馈一般时尝试。",
+    notes: "需要先确认供应链是否能稳定提供升级配件或对应规格。"
+  };
+  const imagePackageBase = {
+    productName,
+    productCategory,
+    recommendedCombinationPlan: planA.combinationName,
+    combinationContent: planA.combinationContent,
+    targetUsers: planA.targetUsers,
+    usageScene: planA.usageScene,
+    coreSellingPoints: planA.coreSellingPoints,
+    referenceImages: product.images?.length ? "已上传" : "待上传",
+    imageCount: "5 张",
+    imageRatio: "1:1 正方形",
+    imageStyle: "干净、清晰、有电商销售感，适合 TEMU 平台",
+    restrictions: "不要出现品牌词，不要夸大功能，不要改变产品主体结构，不要生成产品没有的功能"
+  };
+  const titlePackageBase = {
+    productName,
+    productCategory,
+    combinationPlan: planA.combinationName,
+    productImages: product.images?.length ? "已上传" : "待上传",
+    targetPlatform: "TEMU",
+    outputRequirements: ["3 个 TEMU 商品标题", "推荐使用的标题", "5 个核心卖点", "5 张图对应短文案", "详情页简短描述"],
+    fixedRequirements: [
+      "不要出现品牌词",
+      "不要出现未经确认的认证、材质、承重、尺寸、数据",
+      "不要夸大产品功能",
+      "不要写虚假效果",
+      "标题要简洁、清楚，适合电商平台",
+      "如果是组合产品，要突出组合价值和使用场景"
+    ]
+  };
+
+  return {
+    productBasics: {
+      productName,
+      productCategory,
+      currentComposition: "主产品为核心，配件关系需要根据上传图片和供应链素材进一步确认。",
+      mainUse: "满足用户在对应场景下的基础使用需求。",
+      targetUsers: "对该类目有明确购买需求的 TEMU 用户。",
+      usageScenes: "以商品主图、详情图和上传素材中可见场景为准。"
+    },
+    packagingValue: {
+      worthPackaging: "待观察",
+      productType: "半标品",
+      priceComparisonRisk: "中",
+      transformationSpace: "中",
+      imageExpressionSpace: "中",
+      oneSentenceJudgment: "当前产品可以先围绕组合、配件和场景表达做小范围测试，但不代表最终上架建议。"
+    },
+    planA,
+    planB,
+    priorityAdvice: "建议优先执行方案 A。",
+    materialChecklist: mapMaterialChecklist(undefined),
+    imageGenerationPackage: {
+      ...imagePackageBase,
+      copyText: buildImagePackageCopyText(imagePackageBase, product)
+    },
+    titleSellingPointPackage: {
+      ...titlePackageBase,
+      copyText: buildTitlePackageCopyText(titlePackageBase)
+    },
+    boundaryReminder
+  };
+}
+
+function mapPreGenerationReport(raw: AIPreGenerationRawOutput | undefined, product: ProductInput): PreGenerationReport {
+  const fallback = createDefaultPreGenerationReport(product);
+  const productBasics: ProductBasicsReport = {
+    productName: pickString(raw?.productBasics?.productName, fallback.productBasics.productName),
+    productCategory: pickString(raw?.productBasics?.productCategory, fallback.productBasics.productCategory),
+    currentComposition: pickString(raw?.productBasics?.currentComposition, fallback.productBasics.currentComposition),
+    mainUse: pickString(raw?.productBasics?.mainUse, fallback.productBasics.mainUse),
+    targetUsers: pickString(raw?.productBasics?.targetUsers, fallback.productBasics.targetUsers),
+    usageScenes: pickString(raw?.productBasics?.usageScenes, fallback.productBasics.usageScenes)
+  };
+  const packagingValue: PackagingValueReport = {
+    worthPackaging: pickEnum(raw?.packagingValue?.worthPackaging, packagingWorthValues, fallback.packagingValue.worthPackaging) as PackagingWorth,
+    productType: pickEnum(raw?.packagingValue?.productType, packagingProductTypeValues, fallback.packagingValue.productType) as PackagingProductType,
+    priceComparisonRisk: pickEnum(raw?.packagingValue?.priceComparisonRisk, packagingLevelValues, fallback.packagingValue.priceComparisonRisk) as PackagingLevel,
+    transformationSpace: pickEnum(raw?.packagingValue?.transformationSpace, packagingLevelValues, fallback.packagingValue.transformationSpace) as PackagingLevel,
+    imageExpressionSpace: pickEnum(raw?.packagingValue?.imageExpressionSpace, packagingLevelValues, fallback.packagingValue.imageExpressionSpace) as PackagingLevel,
+    oneSentenceJudgment: pickString(raw?.packagingValue?.oneSentenceJudgment, fallback.packagingValue.oneSentenceJudgment)
+  };
+  const planA: PrimaryCombinationPlan = {
+    combinationName: pickString(raw?.planA?.combinationName, fallback.planA.combinationName),
+    combinationContent: pickString(raw?.planA?.combinationContent, fallback.planA.combinationContent),
+    targetUsers: pickString(raw?.planA?.targetUsers, fallback.planA.targetUsers),
+    usageScene: pickString(raw?.planA?.usageScene, fallback.planA.usageScene),
+    coreSellingPoints: pickString(raw?.planA?.coreSellingPoints, fallback.planA.coreSellingPoints),
+    whyPriorityTest: pickString(raw?.planA?.whyPriorityTest, fallback.planA.whyPriorityTest),
+    suitableImageTypes: pickString(raw?.planA?.suitableImageTypes, fallback.planA.suitableImageTypes)
+  };
+  const planB: BackupCombinationPlan = {
+    combinationName: pickString(raw?.planB?.combinationName, fallback.planB.combinationName),
+    combinationContent: pickString(raw?.planB?.combinationContent, fallback.planB.combinationContent),
+    targetUsers: pickString(raw?.planB?.targetUsers, fallback.planB.targetUsers),
+    usageScene: pickString(raw?.planB?.usageScene, fallback.planB.usageScene),
+    coreSellingPoints: pickString(raw?.planB?.coreSellingPoints, fallback.planB.coreSellingPoints),
+    whenToTry: pickString(raw?.planB?.whenToTry, fallback.planB.whenToTry),
+    notes: pickString(raw?.planB?.notes, fallback.planB.notes)
+  };
+  const materialChecklist = mapMaterialChecklist(raw?.materialChecklist);
+  const imagePackageBase = {
+    productName: pickString(raw?.imageGenerationPackage?.productName, productBasics.productName),
+    productCategory: pickString(raw?.imageGenerationPackage?.productCategory, productBasics.productCategory),
+    recommendedCombinationPlan: pickString(raw?.imageGenerationPackage?.recommendedCombinationPlan, planA.combinationName),
+    combinationContent: pickString(raw?.imageGenerationPackage?.combinationContent, planA.combinationContent),
+    targetUsers: pickString(raw?.imageGenerationPackage?.targetUsers, planA.targetUsers),
+    usageScene: pickString(raw?.imageGenerationPackage?.usageScene, planA.usageScene),
+    coreSellingPoints: pickString(raw?.imageGenerationPackage?.coreSellingPoints, planA.coreSellingPoints),
+    referenceImages: pickString(raw?.imageGenerationPackage?.referenceImages, product.images?.length ? "已上传" : "待上传"),
+    imageCount: pickString(raw?.imageGenerationPackage?.imageCount, "5 张"),
+    imageRatio: pickString(raw?.imageGenerationPackage?.imageRatio, "1:1 正方形"),
+    imageStyle: pickString(raw?.imageGenerationPackage?.imageStyle, "干净、清晰、有电商销售感，适合 TEMU 平台"),
+    restrictions: pickString(raw?.imageGenerationPackage?.restrictions, "不要出现品牌词，不要夸大功能，不要改变产品主体结构，不要生成产品没有的功能")
+  };
+  const titlePackageBase = {
+    productName: pickString(raw?.titleSellingPointPackage?.productName, productBasics.productName),
+    productCategory: pickString(raw?.titleSellingPointPackage?.productCategory, productBasics.productCategory),
+    combinationPlan: pickString(raw?.titleSellingPointPackage?.combinationPlan, planA.combinationName),
+    productImages: pickString(raw?.titleSellingPointPackage?.productImages, product.images?.length ? "已上传" : "待上传"),
+    targetPlatform: pickString(raw?.titleSellingPointPackage?.targetPlatform, "TEMU"),
+    outputRequirements: pickStringArray(raw?.titleSellingPointPackage?.outputRequirements).length > 0
+      ? pickStringArray(raw?.titleSellingPointPackage?.outputRequirements)
+      : fallback.titleSellingPointPackage.outputRequirements,
+    fixedRequirements: pickStringArray(raw?.titleSellingPointPackage?.fixedRequirements).length > 0
+      ? pickStringArray(raw?.titleSellingPointPackage?.fixedRequirements)
+      : fallback.titleSellingPointPackage.fixedRequirements
+  };
+
+  return {
+    productBasics,
+    packagingValue,
+    planA,
+    planB,
+    priorityAdvice: "建议优先执行方案 A。",
+    materialChecklist,
+    imageGenerationPackage: {
+      ...imagePackageBase,
+      copyText: pickString(raw?.imageGenerationPackage?.copyText, buildImagePackageCopyText(imagePackageBase, product))
+    },
+    titleSellingPointPackage: {
+      ...titlePackageBase,
+      copyText: pickString(raw?.titleSellingPointPackage?.copyText, buildTitlePackageCopyText(titlePackageBase))
+    },
+    boundaryReminder: pickString(raw?.boundaryReminder, boundaryReminder)
+  };
+}
+
+export function parseAIAnalysisReport({ product, rawText }: ParseAIAnalysisReportParams): AnalysisReport {
   const raw = parseRawOutput(rawText);
-
-  if (!raw.hotProductAnalysis || !raw.directCopyRisk || !raw.recommendations) {
-    throw new Error("AI 返回内容结构不符合报告类型。");
-  }
-
-  if (!raw.finalConclusion || !raw.actionSuggestions) {
-    throw new Error("AI 返回内容缺少最终结论或操作建议。");
-  }
-
-  const actionSuggestions = mapActionSuggestions(raw.actionSuggestions);
-
-  if (hasEnglishHeavyReport(raw)) {
-    actionSuggestions.push("当前 AI 输出存在部分英文表达，建议后续继续优化中文提示词。");
-  }
 
   const report: AnalysisReport = {
     input: product,
@@ -356,19 +485,16 @@ export function parseAIAnalysisReport({
     hotProductAnalysis: mapHotProductAnalysis(raw.hotProductAnalysis),
     directCopyRisk: mapDirectCopyRisk(raw.directCopyRisk),
     recommendations: mapRecommendations(raw.recommendations),
-    finalConclusion: pickString(raw.finalConclusion, "当前产品方向需要结合更多数据继续验证。"),
-    actionSuggestions
+    finalConclusion: pickString(raw.finalConclusion, "当前产品需要结合素材完整度和供应链情况继续判断。"),
+    actionSuggestions: pickStringArray(raw.actionSuggestions),
+    preGenerationReport: mapPreGenerationReport(raw.preGenerationReport, product)
   };
 
   try {
     return validateAndPolishAIReport(report);
   } catch (error) {
     const message = error instanceof Error ? error.message : "未知后处理错误";
-    console.warn("[AI_REPORT_POLISH_FAILED]", {
-      errorType: "polish",
-      message
-    });
-
+    console.warn("[AI_REPORT_POLISH_FAILED]", { errorType: "polish", message });
     return report;
   }
 }
