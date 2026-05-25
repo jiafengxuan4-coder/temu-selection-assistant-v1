@@ -24,15 +24,56 @@ type CopyPackageButtonProps = {
   text: string;
 };
 
-function CopyPackageButton({ label, text }: CopyPackageButtonProps) {
-  const [status, setStatus] = useState<"idle" | "copied" | "failed">("idle");
+function fallbackCopyText(text: string): boolean {
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "true");
+  textarea.style.position = "fixed";
+  textarea.style.top = "-9999px";
+  textarea.style.left = "-9999px";
 
-  async function handleCopy() {
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+
+  try {
+    return document.execCommand("copy");
+  } catch {
+    return false;
+  } finally {
+    document.body.removeChild(textarea);
+  }
+}
+
+async function copyTextWithFallback(text: string): Promise<boolean> {
+  if (navigator.clipboard?.writeText) {
     try {
       await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // Fall through to the textarea fallback for browsers that block clipboard access.
+    }
+  }
+
+  return fallbackCopyText(text);
+}
+
+function CopyPackageButton({ label, text }: CopyPackageButtonProps) {
+  const [status, setStatus] = useState<"idle" | "copied" | "failed" | "empty">("idle");
+
+  async function handleCopy() {
+    if (!text.trim()) {
+      setStatus("empty");
+      window.setTimeout(() => setStatus("idle"), 2000);
+      return;
+    }
+
+    const copied = await copyTextWithFallback(text);
+
+    if (copied) {
       setStatus("copied");
       window.setTimeout(() => setStatus("idle"), 2000);
-    } catch {
+    } else {
       setStatus("failed");
       window.setTimeout(() => setStatus("idle"), 2000);
     }
@@ -44,7 +85,13 @@ function CopyPackageButton({ label, text }: CopyPackageButtonProps) {
       onClick={handleCopy}
       className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
     >
-      {status === "copied" ? "已复制" : status === "failed" ? "复制失败" : label}
+      {status === "copied"
+        ? "复制成功"
+        : status === "failed"
+          ? "复制失败，请手动复制"
+          : status === "empty"
+            ? "暂无可复制内容"
+            : label}
     </button>
   );
 }

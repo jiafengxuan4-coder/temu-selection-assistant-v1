@@ -498,33 +498,33 @@ export function ProductInputForm({
           <div className="space-y-1">
             <h3 className="text-sm font-semibold text-slate-900">产品规格信息</h3>
             <p className="text-xs leading-5 text-slate-500">
-              规格信息越完整，AI 越容易生成准确的规格图和详情图。请不要填写不确定的数据。
+              规格信息越完整，AI 越容易生成准确的规格图和详情图。请按原始规格填写，系统会尽量自动换算为适合海外平台展示的单位。请不要填写不确定的数据。
             </p>
           </div>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <label className="block">
               <span className="text-xs font-medium text-slate-600">主产品规格</span>
-              <input value={formState.mainProductSpec} onChange={(event) => updateField("mainProductSpec", event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500" />
+              <input value={formState.mainProductSpec} onChange={(event) => updateField("mainProductSpec", event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500" placeholder="例如：Chest: 50-60 cm; Neck: 40-48 cm" />
             </label>
             <label className="block">
               <span className="text-xs font-medium text-slate-600">配件规格</span>
-              <input value={formState.accessorySpec} onChange={(event) => updateField("accessorySpec", event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500" />
+              <input value={formState.accessorySpec} onChange={(event) => updateField("accessorySpec", event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500" placeholder="例如：Leash length: 1.5 m; Poop bag roll: 1 roll" />
             </label>
             <label className="block">
               <span className="text-xs font-medium text-slate-600">产品尺寸</span>
-              <input value={formState.productSize} onChange={(event) => updateField("productSize", event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500" />
+              <input value={formState.productSize} onChange={(event) => updateField("productSize", event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500" placeholder="例如：30 x 20 x 10 cm" />
             </label>
             <label className="block">
               <span className="text-xs font-medium text-slate-600">包装重量</span>
-              <input value={formState.packageWeight} onChange={(event) => updateField("packageWeight", event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500" />
+              <input value={formState.packageWeight} onChange={(event) => updateField("packageWeight", event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500" placeholder="例如：278 g" />
             </label>
             <label className="block">
               <span className="text-xs font-medium text-slate-600">包装尺寸</span>
-              <input value={formState.packageSize} onChange={(event) => updateField("packageSize", event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500" />
+              <input value={formState.packageSize} onChange={(event) => updateField("packageSize", event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500" placeholder="例如：35 x 25 x 8 cm" />
             </label>
             <label className="block">
               <span className="text-xs font-medium text-slate-600">颜色/尺码选项</span>
-              <input value={formState.colorSizeOptions} onChange={(event) => updateField("colorSizeOptions", event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500" />
+              <input value={formState.colorSizeOptions} onChange={(event) => updateField("colorSizeOptions", event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500" placeholder="例如：Purple, Black; S / M / L" />
             </label>
           </div>
         </div>
