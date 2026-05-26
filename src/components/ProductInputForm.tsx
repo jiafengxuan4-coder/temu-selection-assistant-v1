@@ -203,16 +203,13 @@ export function ProductInputForm({
     });
   }
 
-  async function handleImagesChange(fileList: FileList | null) {
+  async function addImageFiles(files: File[], options?: { allowPartialWhenFull?: boolean; emptyMessage?: string }) {
     setImageError("");
-    const files = Array.from(fileList ?? []);
 
     if (files.length === 0) {
-      return;
-    }
-
-    if (imageStates.length + files.length > maxImageCount) {
-      setImageError("最多支持上传 10 张截图，请删除部分图片后重试。");
+      if (options?.emptyMessage) {
+        setImageError(options.emptyMessage);
+      }
       return;
     }
 
@@ -226,12 +223,41 @@ export function ProductInputForm({
       return;
     }
 
+    const availableSlots = maxImageCount - imageStates.length;
+
+    if (availableSlots <= 0) {
+      setImageError("最多支持上传 10 张图片。");
+      return;
+    }
+
+    if (files.length > availableSlots && !options?.allowPartialWhenFull) {
+      setImageError("最多支持上传 10 张截图，请删除部分图片后重试。");
+      return;
+    }
+
+    const filesToAdd = options?.allowPartialWhenFull ? files.slice(0, availableSlots) : files;
+
     try {
-      const nextImages = [...imageStates, ...(await Promise.all(files.map(readImageFile)))];
+      const nextImages = [...imageStates, ...(await Promise.all(filesToAdd.map(readImageFile)))];
       setImageStates(nextImages);
+
+      if (files.length > filesToAdd.length) {
+        setImageError("最多支持上传 10 张图片。已添加可加入的图片，其余图片未添加。");
+      }
     } catch {
       setImageError("图片读取失败，请重新选择截图。");
     }
+  }
+
+  async function handleImagesChange(fileList: FileList | null) {
+    await addImageFiles(Array.from(fileList ?? []));
+  }
+
+  async function handlePasteImages(files: File[]) {
+    await addImageFiles(files, {
+      allowPartialWhenFull: true,
+      emptyMessage: "剪贴板中未检测到图片。"
+    });
   }
 
   function removeImage(index: number) {
@@ -354,7 +380,8 @@ export function ProductInputForm({
       <div className="space-y-1">
         <h2 className="text-lg font-semibold text-slate-950">商品信息</h2>
         <p className="text-sm leading-6 text-slate-500">
-          请上传产品相关图片，最多支持 10 张。图片越完整，AI 对产品结构、组合空间、配件关系、主图方向和标题卖点的判断越准确。
+          请上传产品相关图片，最多支持 10 张。支持截图后直接 Ctrl + V 粘贴图片，也可以点击选择本地图片上传。
+          图片越完整，AI 对产品结构、组合空间、配件关系、主图方向和标题卖点的判断越准确。
         </p>
       </div>
 
@@ -393,6 +420,7 @@ export function ProductInputForm({
           }))}
           error={imageError}
           onFilesChange={handleImagesChange}
+          onPasteFiles={handlePasteImages}
           onRemove={removeImage}
         />
 

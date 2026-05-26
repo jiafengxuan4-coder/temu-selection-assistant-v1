@@ -1,5 +1,7 @@
 ﻿"use client";
 
+import type { ClipboardEvent } from "react";
+
 type ImagePreviewItem = {
   previewUrl: string;
   fileName: string;
@@ -10,6 +12,7 @@ type ImageUploadPreviewProps = {
   images: ImagePreviewItem[];
   error: string;
   onFilesChange: (files: FileList | null) => void;
+  onPasteFiles: (files: File[]) => void;
   onRemove: (index: number) => void;
 };
 
@@ -17,14 +20,36 @@ export function ImageUploadPreview({
   images,
   error,
   onFilesChange,
+  onPasteFiles,
   onRemove
 }: ImageUploadPreviewProps) {
+  function handlePaste(event: ClipboardEvent<HTMLDivElement>) {
+    const pastedFiles = Array.from(event.clipboardData.items)
+      .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+      .map((item) => item.getAsFile())
+      .filter((file): file is File => file !== null);
+
+    if (pastedFiles.length === 0) {
+      onPasteFiles([]);
+      return;
+    }
+
+    event.preventDefault();
+    onPasteFiles(pastedFiles);
+  }
+
   return (
-    <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+    <div
+      className="rounded-md border border-slate-200 bg-slate-50 p-3 outline-none focus-within:border-slate-400 focus:border-slate-400"
+      tabIndex={0}
+      onPaste={handlePaste}
+      onClick={(event) => event.currentTarget.focus()}
+    >
       <div className="space-y-2">
         <h3 className="text-sm font-semibold text-slate-900">上传产品相关图片</h3>
         <div className="space-y-1 text-xs leading-5 text-slate-500">
           <p>请上传产品相关图片，最多支持 10 张。</p>
+          <p>支持截图后直接 Ctrl + V 粘贴图片，也可以点击选择本地图片上传。</p>
           <p>基础提交：至少 3 张图</p>
           <p>标准提交：建议 5-6 张图</p>
           <p>完整提交：最多 10 张图</p>
