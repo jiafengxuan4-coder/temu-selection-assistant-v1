@@ -71,7 +71,11 @@ const petLeashExample: FormState = {
 
 const allowedImageTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
 const maxImageSize = 5 * 1024 * 1024;
+const maxCompressedImageSize = 2 * 1024 * 1024;
 const maxImageCount = 10;
+const maxTotalImageSize = 9 * 1024 * 1024;
+const maxCompressedImageEdge = 1800;
+const compressedImageQuality = 0.8;
 
 function toOptionalNumber(value: string): number | undefined {
   if (!value.trim()) {
@@ -96,6 +100,75 @@ function toOptionalProductSpecs(formState: FormState): ProductInput["productSpec
 }
 function formatFileSize(size: number): string {
   return `${(size / 1024 / 1024).toFixed(2)} MB`;
+}
+
+function getDataUrlSize(dataUrl: string): number {
+  const base64 = dataUrl.includes(",") ? dataUrl.split(",").pop() ?? "" : dataUrl;
+  const padding = base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0;
+  return Math.max(0, Math.round((base64.length * 3) / 4 - padding));
+}
+
+function loadImageFromFile(file: File): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("图片读取失败，请重新选择截图。"));
+    };
+    image.src = objectUrl;
+  });
+}
+
+async function compressImageFile(file: File): Promise<{ dataUrl: string; size: number; mimeType: string }> {
+  const image = await loadImageFromFile(file);
+  const scale = Math.min(1, maxCompressedImageEdge / Math.max(image.naturalWidth, image.naturalHeight));
+  const width = Math.max(1, Math.round(image.naturalWidth * scale));
+  const height = Math.max(1, Math.round(image.naturalHeight * scale));
+
+  if (scale === 1 && file.size <= maxCompressedImageSize && file.type !== "image/png") {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onload = () => {
+        if (typeof reader.result !== "string") {
+          reject(new Error("图片读取失败，请重新选择截图。"));
+          return;
+        }
+
+        resolve({
+          dataUrl: reader.result,
+          size: getDataUrlSize(reader.result),
+          mimeType: file.type || "image/jpeg"
+        });
+      };
+      reader.onerror = () => reject(new Error("图片读取失败，请重新选择截图。"));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    throw new Error("图片压缩失败，请重新选择截图。");
+  }
+
+  context.drawImage(image, 0, 0, width, height);
+  const dataUrl = canvas.toDataURL("image/jpeg", compressedImageQuality);
+
+  return {
+    dataUrl,
+    size: getDataUrlSize(dataUrl),
+    mimeType: "image/jpeg"
+  };
 }
 
 function toProductInput(
@@ -179,28 +252,20 @@ export function ProductInputForm({
     onClear?.();
   }
 
-  function readImageFile(file: File): Promise<ImageState> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
+  async function readImageFile(file: File): Promise<ImageState> {
+    const compressedImage = await compressImageFile(file);
 
-      reader.onload = () => {
-        if (typeof reader.result !== "string") {
-          reject(new Error("图片读取失败，请重新选择截图。"));
-          return;
-        }
+    if (compressedImage.size > maxCompressedImageSize) {
+      throw new Error("图片过大，请裁剪关键区域后重新上传。");
+    }
 
-        resolve({
-          imageBase64: reader.result,
-          imageMimeType: file.type,
-          imageFileName: file.name,
-          imageFileSize: file.size,
-          imagePreviewUrl: reader.result
-        });
-      };
-
-      reader.onerror = () => reject(new Error("图片读取失败，请重新选择截图。"));
-      reader.readAsDataURL(file);
-    });
+    return {
+      imageBase64: compressedImage.dataUrl,
+      imageMimeType: compressedImage.mimeType,
+      imageFileName: file.name,
+      imageFileSize: compressedImage.size,
+      imagePreviewUrl: compressedImage.dataUrl
+    };
   }
 
   async function addImageFiles(files: File[], options?: { allowPartialWhenFull?: boolean; emptyMessage?: string }) {
@@ -239,13 +304,20 @@ export function ProductInputForm({
 
     try {
       const nextImages = [...imageStates, ...(await Promise.all(filesToAdd.map(readImageFile)))];
+      const totalSize = nextImages.reduce((sum, image) => sum + image.imageFileSize, 0);
+
+      if (totalSize > maxTotalImageSize) {
+        setImageError("当前图片总量较大，可能导致分析失败。建议保留 3-5 张关键图片后再生成报告。");
+        return;
+      }
+
       setImageStates(nextImages);
 
       if (files.length > filesToAdd.length) {
         setImageError("最多支持上传 10 张图片。已添加可加入的图片，其余图片未添加。");
       }
-    } catch {
-      setImageError("图片读取失败，请重新选择截图。");
+    } catch (error) {
+      setImageError(error instanceof Error ? error.message : "图片读取失败，请重新选择截图。");
     }
   }
 
@@ -363,6 +435,13 @@ export function ProductInputForm({
     event.preventDefault();
 
     const hasImages = imageStates.length > 0;
+    const totalImageSize = imageStates.reduce((sum, image) => sum + image.imageFileSize, 0);
+
+    if (totalImageSize > maxTotalImageSize) {
+      setError("当前图片总量较大，可能导致分析失败。建议保留 3-5 张关键图片后再生成报告。");
+      return;
+    }
+
     const product = toProductInput(formState, imageStates, hasImages, priceMeta);
 
     if (!product) {
@@ -380,7 +459,7 @@ export function ProductInputForm({
       <div className="space-y-1">
         <h2 className="text-lg font-semibold text-slate-950">商品信息</h2>
         <p className="text-sm leading-6 text-slate-500">
-          请上传产品相关图片，最多支持 10 张。支持截图后直接 Ctrl + V 粘贴图片，也可以点击选择本地图片上传。
+          请上传产品相关图片，最多支持 10 张，但建议优先上传 3-5 张关键图片。支持截图后直接 Ctrl + V 粘贴图片，也可以点击选择本地图片上传。
           图片越完整，AI 对产品结构、组合空间、配件关系、主图方向和标题卖点的判断越准确。
         </p>
       </div>

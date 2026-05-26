@@ -43,6 +43,14 @@ export async function analyzeProductFromClient(
       const parsed = JSON.parse(responseText) as unknown;
       result = isAnalyzeProductResponse(parsed) ? parsed : null;
     } catch {
+      if (response.status === 413) {
+        return {
+          report: null,
+          source: "mock_fallback",
+          message: "图片数量或图片体积过大，导致分析请求被拒绝。请减少图片数量，或上传裁剪后的关键区域截图后重试。"
+        };
+      }
+
       return {
         report: null,
         source: "mock_fallback",

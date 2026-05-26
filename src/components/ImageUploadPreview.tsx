@@ -48,11 +48,12 @@ export function ImageUploadPreview({
       <div className="space-y-2">
         <h3 className="text-sm font-semibold text-slate-900">上传产品相关图片</h3>
         <div className="space-y-1 text-xs leading-5 text-slate-500">
-          <p>请上传产品相关图片，最多支持 10 张。</p>
-          <p>支持截图后直接 Ctrl + V 粘贴图片，也可以点击选择本地图片上传。</p>
+          <p>支持上传本地图片，也支持截图后 Ctrl + V 粘贴图片。系统会自动压缩较大的图片。</p>
+          <p>支持最多 10 张，但建议优先上传 3-5 张关键图片。</p>
           <p>基础提交：至少 3 张图</p>
           <p>标准提交：建议 5-6 张图</p>
           <p>完整提交：最多 10 张图</p>
+          <p>为了提升速度和成功率，建议优先上传：商品详情页截图、主产品图、SKU/规格局部截图、配件图、规格表图。</p>
           <p>图片越完整，AI 对产品结构、组合空间、配件关系、主图方向和标题卖点的判断越准确。</p>
           <p>如果需要识别颜色、尺码、规格，请尽量上传 SKU 区域或规格表的局部截图，整页截图中文字太小时可能识别不完整。</p>
         </div>
@@ -74,7 +75,7 @@ export function ImageUploadPreview({
         </label>
 
         <p className="text-xs leading-5 text-slate-500">
-          支持 PNG、JPG、JPEG、WEBP；单张图片不超过 5MB；最多 10 张。
+          支持 PNG、JPG、JPEG、WEBP；单张原图不超过 5MB；压缩后单张不超过 2MB；总图量建议控制在 9MB 内。
         </p>
         <p className="text-xs leading-5 text-slate-500">
           颜色、尺码、规格信息建议单独截局部图上传，避免小字在整页截图中识别不完整。
