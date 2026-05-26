@@ -439,21 +439,21 @@ function createDefaultPreGenerationReport(product: ProductInput): PreGenerationR
   const skuAssessment = inferSkuAssessment(product);
   const planA: PrimaryCombinationPlan = {
     combinationName: `${productName} 场景组合优先测试方案`,
-    combinationContent: "主产品 + 相关配件 + 场景化使用补充件",
+    combinationContent: `主产品 1 件 + 需去 1688 确认的轻量配件 1-2 件。优先搜索：${productName} 配件、${productName} 收纳袋、${productName} 防尘罩、${productName} 绑带、${productName} 替换件。配件作用：补齐使用场景、提升套装价值，但不要明显增加体积重量。`,
     targetUsers: "对该产品已有明确需求的人群",
     usageScene: "日常使用、礼物场景或平台主图可表达的核心使用场景",
-    coreSellingPoints: "围绕组合价值、使用便利性和场景完整度表达，不夸大产品功能。",
-    whyPriorityTest: "该方案不是直接复制单品，而是通过组合内容提高素材表达空间，适合作为第一轮小批量测试方向。",
-    suitableImageTypes: "组合平铺图、使用场景图、配件关系图、卖点聚焦图、主图风格图"
+    coreSellingPoints: "围绕具体配件带来的套装价值、使用便利性和场景完整度表达，不夸大产品功能。",
+    whyPriorityTest: "建议先测试轻量配件组合，因为采购和包装复杂度相对更低。需要确认：配件单价、组合后重量、包装尺寸、供应商是否能稳定配齐、是否会增加售后风险。",
+    suitableImageTypes: "组合平铺图、使用场景图、配件清单图、卖点聚焦图、主图风格图。不建议第一轮加入：大型桌子、遮阳伞、厚重垫子，原因是可能增加成本、体积重量和履约复杂度。"
   };
   const planB: BackupCombinationPlan = {
     combinationName: `${productName} 升级备选方案`,
-    combinationContent: "主产品 + 规格/颜色/配件升级方向",
+    combinationContent: `主产品 1 件 + 需去 1688 确认的升级配件 1 件。优先搜索：${productName} 升级款、${productName} 加厚配件、${productName} 替换件、${productName} 收纳包、${productName} 套装。配件作用：强化规格、收纳、保护或使用便利性。`,
     targetUsers: "愿意为更完整使用体验付费的用户",
     usageScene: "需要更清晰卖点或更强场景表达的使用场景",
-    coreSellingPoints: "突出升级点和使用场景，但不写未经确认的认证、材质、承重、尺寸或数据。",
-    whenToTry: "当方案 A 素材不足、供应链不稳定或测试反馈一般时尝试。",
-    notes: "需要先确认供应链是否能稳定提供升级配件或对应规格。"
+    coreSellingPoints: "突出具体升级配件带来的使用价值和场景价值，但不写未经确认的认证、材质、承重、尺寸或数据。",
+    whenToTry: "当方案 A 素材不足、供应链不稳定或测试反馈一般，且供应商能稳定提供升级配件时再尝试。",
+    notes: "需要确认升级配件成本、重量、包装尺寸、交期、是否容易破损、是否增加退货售后。不建议第一轮加入：大尺寸地垫、厚重垫子、大型桌面类配件，原因是可能提高物流成本和履约难度。"
   };
   const imagePackageBase = {
     productName,
