@@ -134,9 +134,9 @@ export default function Home() {
   if (!authorizedPhone) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-8 text-slate-950">
-        <section className="w-full max-w-lg rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex items-center gap-5">
-            <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 text-sm font-medium text-slate-600 shadow-md">
+        <section className="w-full max-w-lg rounded-lg border border-slate-200 bg-white p-7 shadow-sm">
+          <div className="flex items-center gap-6">
+            <div className="relative flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 text-sm font-medium text-slate-600 shadow-md">
               <span>小火箭</span>
               <img
                 src={founderAvatarPath}
@@ -195,9 +195,9 @@ export default function Home() {
     <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-950 sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
         <header className="space-y-3">
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:gap-6">
-              <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 text-sm font-medium text-slate-600 shadow-md sm:h-24 sm:w-24">
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+            <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:gap-8">
+              <div className="relative flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 text-sm font-medium text-slate-600 shadow-md sm:h-32 sm:w-32">
                 <span>小火箭</span>
                 <img
                   src={founderAvatarPath}
