@@ -134,9 +134,9 @@ export default function Home() {
   if (!authorizedPhone) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-8 text-slate-950">
-        <section className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex items-start gap-4">
-            <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 text-xs font-medium text-slate-600 shadow-sm">
+        <section className="w-full max-w-lg rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex items-center gap-5">
+            <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 text-sm font-medium text-slate-600 shadow-md">
               <span>小火箭</span>
               <img
                 src={founderAvatarPath}
@@ -195,9 +195,9 @@ export default function Home() {
     <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-950 sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
         <header className="space-y-3">
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-              <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 text-xs font-medium text-slate-600 shadow-sm">
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:gap-6">
+              <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 text-sm font-medium text-slate-600 shadow-md sm:h-24 sm:w-24">
                 <span>小火箭</span>
                 <img
                   src={founderAvatarPath}
@@ -208,9 +208,9 @@ export default function Home() {
                   }}
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 <p className="text-sm font-medium text-slate-500">temu-selection-assistant-v1</p>
-                <h1 className="text-3xl font-semibold tracking-normal text-slate-950 sm:text-4xl">
+                <h1 className="text-3xl font-bold tracking-normal text-slate-950 sm:text-4xl">
                   伙箭跨境｜TEMU 核价选品助手
                 </h1>
                 <p className="max-w-3xl text-base leading-7 text-slate-600">
