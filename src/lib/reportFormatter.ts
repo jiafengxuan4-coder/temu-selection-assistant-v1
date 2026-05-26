@@ -9,7 +9,11 @@ function formatList(items: string[]): string {
 
 function formatProductPrice(report: AnalysisReport): string {
   const priceDisplay = report.input.priceDisplay?.trim();
-  return priceDisplay && priceDisplay.length > 0 ? priceDisplay : String(report.input.price);
+  if (priceDisplay && priceDisplay.length > 0) {
+    return priceDisplay;
+  }
+
+  return Number.isFinite(report.input.price) && report.input.price > 0 ? String(report.input.price) : "未提供";
 }
 
 function trimNumber(value: number): string {

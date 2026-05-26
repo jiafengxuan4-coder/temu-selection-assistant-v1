@@ -38,6 +38,20 @@ function pickString(value: unknown): string | undefined {
   return normalized.length > 0 && normalized.toLowerCase() !== "null" ? normalized : undefined;
 }
 
+function cleanProductName(value: string | undefined): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const cleaned = value
+    .replace(/\b(TEMU|Amazon|AliExpress|1688)\b/gi, "")
+    .replace(/^[A-Z0-9][A-Z0-9-]{2,}\s+/g, "")
+    .replace(/\s+/g, " ")
+    .replace(/^[\s:：，、。-]+|[\s:：，、。-]+$/g, "");
+
+  return cleaned.length > 0 ? cleaned : value;
+}
+
 function parseLooseNumber(value: unknown): number | undefined {
   if (typeof value === "number" && Number.isFinite(value)) {
     return value;
@@ -380,6 +394,10 @@ function parseRecognizedFields(rawText: string, imageCount: number): RecognizedP
   );
   const result: RecognizedProductFields = {
     title: pickString(parsed.title),
+    rawRecognizedTitle: pickString(parsed.rawRecognizedTitle) ?? pickString(parsed.title),
+    rawRecognizedDescription: pickString(parsed.rawRecognizedDescription),
+    cleanedProductName: pickString(parsed.cleanedProductName)
+      ?? cleanProductName(pickString(parsed.rawRecognizedTitle) ?? pickString(parsed.title)),
     category: pickString(parsed.category),
     price: priceInfo.price,
     priceDisplay: priceInfo.priceDisplay,
@@ -392,6 +410,10 @@ function parseRecognizedFields(rawText: string, imageCount: number): RecognizedP
     reviewCount: parseSalesCount(parsed.reviewCount),
     reviewsText: pickString(parsed.reviewsText),
     imageCount,
+    recognizedSpecInfo: pickString(parsed.recognizedSpecInfo),
+    recognizedSizeInfo: pickString(parsed.recognizedSizeInfo),
+    recognizedColorStyleInfo: pickString(parsed.recognizedColorStyleInfo),
+    recognizedWeightDimensionInfo: pickString(parsed.recognizedWeightDimensionInfo),
     rawText: pickString(parsed.rawText) ?? rawText
   };
 
@@ -418,6 +440,9 @@ function buildRecognitionPrompt(imageCount: number): string {
 返回格式：
 {
   "title": null,
+  "rawRecognizedTitle": null,
+  "rawRecognizedDescription": null,
+  "cleanedProductName": null,
   "category": null,
   "price": null,
   "priceDisplay": null,
@@ -432,17 +457,32 @@ function buildRecognitionPrompt(imageCount: number): string {
   "confidence": "low",
   "missingFields": [],
   "warnings": [],
+  "recognizedSpecInfo": null,
+  "recognizedSizeInfo": null,
+  "recognizedColorStyleInfo": null,
+  "recognizedWeightDimensionInfo": null,
   "rawText": ""
 }
 
 规则：
 1. 只提取截图中真实出现的信息，不要编造。
-2. title 识别商品标题或最接近的商品名称。
-3. price 只提取商品售价，返回数字。
-4. priceDisplay 必须保留截图中的原始价格和币种符号，例如 €9.79、$9.79、US$9.79、￥69、£8.99、CA$12.99、AU$15.99。
-5. priceCurrency 返回 USD / EUR / CNY / GBP / CAD / AUD / JPY / KRW / UNKNOWN / null。
-6. priceSource 返回 final_price / estimated_price / coupon_price / discount_price / current_sale_price / previous_price / original_price / strikethrough_price / uncertain / null。
-7. priceCandidates 返回识别到的所有价格候选，每个候选包含 value、display、currency、source、reason。
+2. title 尽量保留图片/截图中识别到的完整商品标题，不要过度压缩或概括。
+3. rawRecognizedTitle 保留图片中看到的完整原始标题；如果多张图有相关标题或描述，请尽量合并为完整原始识别标题。
+4. rawRecognizedDescription 保留图片中识别到的相关产品描述、卖点或长描述。
+5. cleanedProductName 输出清洗后的通用产品名称，去掉品牌词、平台词和无关修饰词，保留产品通用名称，例如“狗背带和牵引绳套装”。
+6. 重点识别这些区域：商品标题区域、价格区域、销量/评分/评论区域、颜色选项区域、尺码选项区域、SKU/变体按钮区域、规格表/尺码表/参数表区域、图片中被红框/箭头/标注强调的区域。
+7. 即使颜色/尺码文字较小，也要尝试从 SKU 选项按钮、颜色按钮、尺码按钮、变体卡片中读取。
+8. 如果整页截图信息较多，应特别关注红框、箭头、标注区域，因为这些区域通常是用户希望重点识别的内容。
+9. 如果图片中出现颜色选项、颜色按钮、SKU 颜色卡片，请尽量提取所有可见选项，输出到 recognizedColorStyleInfo。
+10. 如果有当前选中颜色，请写成：当前选中颜色：xxx；全部可选颜色：黑色、紫色、蓝色、红色、玫红色。
+11. 如果图片中出现尺码按钮、尺码选项、SKU 尺码区域，请尽量提取所有可见尺码，输出到 recognizedSizeInfo。
+12. 如果有当前选中尺码，请写成：当前选中尺码：xxx；全部可选尺码：S、M、L、XL。
+13. 如果图片中出现规格表、尺码表、参数表，请尽量结构化识别，不要只写“未识别”。优先提取尺码、颜色、长度、宽度、高度、重量、包装尺寸、适用对象、配件数量。
+14. price 只提取商品售价，返回数字。
+15. priceDisplay 必须保留截图中的原始价格和币种符号，例如 €9.79、$9.79、US$9.79、￥69、£8.99、CA$12.99、AU$15.99。
+16. priceCurrency 返回 USD / EUR / CNY / GBP / CAD / AUD / JPY / KRW / UNKNOWN / null。
+17. priceSource 返回 final_price / estimated_price / coupon_price / discount_price / current_sale_price / previous_price / original_price / strikethrough_price / uncertain / null。
+18. priceCandidates 返回识别到的所有价格候选，每个候选包含 value、display、currency、source、reason。
 8. TEMU 页面中，如果价格前有“预估”“预计”“到手”“券后”“折后”“限时”“最后”“sale”“deal”等词，应优先作为主价格。
 9. 如果价格前有“预估”，这个价格通常是当前用户最应该参考的成交价，应优先于原价和前价，priceSource 使用 estimated_price。
 10. 如果价格被划线，或旁边显示“原价”“前价”“list price”“was”“before”等，不要作为主 price。
@@ -459,13 +499,15 @@ function buildRecognitionPrompt(imageCount: number): string {
 17. reviewCount 返回评论数量，如果看不到则为 null。
 18. reviewsText 通常为空，除非截图中真的有评论内容。
 19. category 如果截图没有明确类目，可以根据商品外观粗略判断，但 confidence 不得为 high。
-20. missingFields 写出没识别到的字段。
-21. 识别不到的字段必须返回 null，不要猜销量、评分、评论。
-22. 如果图片模糊、裁剪严重、关键信息缺失，请在 warnings 中用中文说明。
-23. 多张截图来自同一个商品，请综合识别，不要逐张重复输出。
-24. 如果不同截图字段冲突，以更清晰、更完整、更像商品详情页主信息的字段为准。
-25. 如果多张截图信息可能不一致，在 warnings 中加入“多张截图信息可能存在不一致，建议人工核对”。
-26. 如果某张图无法识别，不影响其他图片的信息提取。`;
+20. 如果上传图片里包含规格表、尺码表、参数表，请尽量识别为结构化信息：recognizedSpecInfo、recognizedSizeInfo、recognizedColorStyleInfo、recognizedWeightDimensionInfo。
+21. 如果没有识别到规格、尺码、颜色款式、重量尺寸信息，对应字段返回 null，不要编造。
+22. missingFields 写出没识别到的字段。
+23. 识别不到的字段必须返回 null，不要猜销量、评分、评论。
+24. 如果图片模糊、裁剪严重、关键信息缺失，请在 warnings 中用中文说明。
+25. 多张截图来自同一个商品，请综合识别，不要逐张重复输出。
+26. 如果不同截图字段冲突，以更清晰、更完整、更像商品详情页主信息的字段为准。
+27. 如果多张截图信息可能不一致，在 warnings 中加入“多张截图信息可能存在不一致，建议人工核对”。
+28. 如果某张图无法识别，不影响其他图片的信息提取。`;
 }
 
 export async function recognizeProductFromImage({

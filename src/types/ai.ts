@@ -4,7 +4,15 @@
   RecognizedProductFields,
   StandardizationLevel
 } from "@/types/product";
-import type { AnalysisReport, MaterialRequirement, PackagingLevel, PackagingProductType, PackagingWorth } from "@/types/recommendation";
+import type {
+  AnalysisReport,
+  MaterialRequirement,
+  PackagingLevel,
+  PackagingProductType,
+  PackagingWorth,
+  SkuConversionImpact,
+  SkuDependencyLevel
+} from "@/types/recommendation";
 import type {
   ConfidenceLevel,
   HotProductFactorType,
@@ -39,6 +47,7 @@ export type AnalyzeProductResponse =
 
 export type AIPreGenerationRawOutput = {
   productBasics?: {
+    rawRecognizedTitle?: string;
     productName?: string;
     productCategory?: string;
     currentComposition?: string;
@@ -52,6 +61,10 @@ export type AIPreGenerationRawOutput = {
     priceComparisonRisk?: PackagingLevel;
     transformationSpace?: PackagingLevel;
     imageExpressionSpace?: PackagingLevel;
+    skuDependency?: SkuDependencyLevel;
+    currentSkuInfo?: string;
+    skuConversionImpact?: SkuConversionImpact;
+    skuSuggestion?: string;
     oneSentenceJudgment?: string;
   };
   planA?: {

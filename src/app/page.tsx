@@ -14,6 +14,7 @@ import type { ProductInput, RecognizedProductFields } from "@/types/product";
 import type { AnalysisReport } from "@/types/recommendation";
 
 const authorizedPhoneStorageKey = "temu_selection_authorized_phone";
+const founderAvatarPath = "/brand/xiaohuojian-avatar.jpg";
 
 type PhoneAuthResponse =
   | { ok: true; phone: string; message?: string }
@@ -134,9 +135,28 @@ export default function Home() {
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-8 text-slate-950">
         <section className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-slate-500">temu-selection-assistant-v1</p>
-            <h1 className="text-2xl font-semibold text-slate-950">TEMU 核价选品助手</h1>
+          <div className="flex items-start gap-4">
+            <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 text-xs font-medium text-slate-600 shadow-sm">
+              <span>小火箭</span>
+              <img
+                src={founderAvatarPath}
+                alt="小火箭｜伙箭跨境创始人"
+                className="absolute inset-0 h-full w-full object-cover"
+                onError={(event) => {
+                  event.currentTarget.style.display = "none";
+                }}
+              />
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-slate-500">temu-selection-assistant-v1</p>
+              <h1 className="text-2xl font-semibold text-slate-950">伙箭跨境｜TEMU 核价选品助手</h1>
+              <p className="text-sm text-slate-500">小火箭｜伙箭跨境创始人</p>
+            </div>
+          </div>
+          <div className="mt-4 space-y-2">
+            <p className="text-sm leading-6 text-slate-600">
+              伙箭跨境出品，帮助 TEMU 卖家快速完成产品识别、核价分析与 AI 图文生成前置准备。
+            </p>
             <p className="text-sm leading-6 text-slate-600">请输入已开通的手机号进入工具。</p>
           </div>
 
@@ -175,14 +195,30 @@ export default function Home() {
     <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-950 sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
         <header className="space-y-3">
-          <p className="text-sm font-medium text-slate-500">temu-selection-assistant-v1</p>
-          <div className="space-y-2">
-            <h1 className="text-3xl font-semibold tracking-normal text-slate-950 sm:text-4xl">
-              TEMU 核价选品助手
-            </h1>
-            <p className="max-w-3xl text-base leading-7 text-slate-600">
-              上传爆款信息，拆解疑似爆款因素，生成更容易通过核价的差异化选品方向。
-            </p>
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+              <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 text-xs font-medium text-slate-600 shadow-sm">
+                <span>小火箭</span>
+                <img
+                  src={founderAvatarPath}
+                  alt="小火箭｜伙箭跨境创始人"
+                  className="absolute inset-0 h-full w-full object-cover"
+                  onError={(event) => {
+                    event.currentTarget.style.display = "none";
+                  }}
+                />
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-slate-500">temu-selection-assistant-v1</p>
+                <h1 className="text-3xl font-semibold tracking-normal text-slate-950 sm:text-4xl">
+                  伙箭跨境｜TEMU 核价选品助手
+                </h1>
+                <p className="max-w-3xl text-base leading-7 text-slate-600">
+                  伙箭跨境出品，帮助 TEMU 卖家快速完成产品识别、核价分析与 AI 图文生成前置准备。
+                </p>
+                <p className="text-sm text-slate-500">小火箭｜伙箭跨境创始人</p>
+              </div>
+            </div>
           </div>
           <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-700 sm:flex-row sm:items-center sm:justify-between">
             <span>当前登录手机号：{maskPhone(authorizedPhone)}</span>

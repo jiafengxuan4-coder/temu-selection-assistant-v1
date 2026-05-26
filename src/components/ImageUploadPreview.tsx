@@ -29,6 +29,7 @@ export function ImageUploadPreview({
           <p>标准提交：建议 5-6 张图</p>
           <p>完整提交：最多 10 张图</p>
           <p>图片越完整，AI 对产品结构、组合空间、配件关系、主图方向和标题卖点的判断越准确。</p>
+          <p>如果需要识别颜色、尺码、规格，请尽量上传 SKU 区域或规格表的局部截图，整页截图中文字太小时可能识别不完整。</p>
         </div>
       </div>
 
@@ -49,6 +50,9 @@ export function ImageUploadPreview({
 
         <p className="text-xs leading-5 text-slate-500">
           支持 PNG、JPG、JPEG、WEBP；单张图片不超过 5MB；最多 10 张。
+        </p>
+        <p className="text-xs leading-5 text-slate-500">
+          颜色、尺码、规格信息建议单独截局部图上传，避免小字在整页截图中识别不完整。
         </p>
 
         {images.length > 0 ? (

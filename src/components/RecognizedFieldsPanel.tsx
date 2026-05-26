@@ -120,7 +120,9 @@ export function RecognizedFieldsPanel({
             <p className="mt-1 text-xs text-slate-500">来自本次上传的产品相关图片</p>
           </div>
         ) : null}
-        <FieldRow label="商品标题" value={recognizedFields.title} manualValue={manualProduct?.title} />
+        <FieldRow label="原始识别标题" value={recognizedFields.rawRecognizedTitle ?? recognizedFields.title} manualValue={manualProduct?.title} />
+        <FieldRow label="清洗后产品名称" value={recognizedFields.cleanedProductName} manualValue={manualProduct?.cleanedProductName} />
+        <FieldRow label="原始识别描述" value={recognizedFields.rawRecognizedDescription} />
         <FieldRow
           label="商品类目"
           value={recognizedFields.category}
@@ -140,6 +142,10 @@ export function RecognizedFieldsPanel({
         <FieldRow label="月销量" value={recognizedFields.monthlySales} manualValue={manualProduct?.monthlySales} />
         <FieldRow label="商品评分" value={recognizedFields.rating} manualValue={manualProduct?.rating} />
         <FieldRow label="评论内容" value={recognizedFields.reviewsText} manualValue={manualProduct?.reviewsText} />
+        <FieldRow label="识别到的规格信息" value={recognizedFields.recognizedSpecInfo} manualValue={manualProduct?.productSpecs?.mainProductSpec} />
+        <FieldRow label="识别到的尺码信息" value={recognizedFields.recognizedSizeInfo} manualValue={manualProduct?.productSpecs?.productSize} />
+        <FieldRow label="识别到的颜色/款式信息" value={recognizedFields.recognizedColorStyleInfo} manualValue={manualProduct?.productSpecs?.colorSizeOptions} />
+        <FieldRow label="识别到的重量/尺寸信息" value={recognizedFields.recognizedWeightDimensionInfo} manualValue={manualProduct?.productSpecs?.packageSize} />
         <div className="rounded-md bg-slate-50 p-3">
           <p className="text-xs font-medium text-slate-500">识别置信度</p>
           <p className="mt-1 text-sm font-medium text-slate-900">{confidenceLabelMap[confidence]}</p>

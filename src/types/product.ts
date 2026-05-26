@@ -49,11 +49,16 @@ export type ProductInput = {
   monthlySales?: number;
   rating?: number;
   reviewsText?: string;
+  rawRecognizedTitle?: string;
+  cleanedProductName?: string;
   productSpecs?: ProductSpecsInput;
 };
 
 export type RecognizedProductFields = {
   title?: string;
+  rawRecognizedTitle?: string;
+  rawRecognizedDescription?: string;
+  cleanedProductName?: string;
   category?: string;
   inferredCategory?: string;
   categorySource?: "manual" | "recognized" | "inferred" | "unknown";
@@ -71,6 +76,10 @@ export type RecognizedProductFields = {
   missingFields?: string[];
   warnings?: string[];
   imageCount?: number;
+  recognizedSpecInfo?: string;
+  recognizedSizeInfo?: string;
+  recognizedColorStyleInfo?: string;
+  recognizedWeightDimensionInfo?: string;
   rawText?: string;
 };
 

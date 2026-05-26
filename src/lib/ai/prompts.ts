@@ -24,6 +24,8 @@ export function buildHotProductAnalysisUserPrompt(product: ProductInput): string
   const productJson = JSON.stringify(
     {
       title: product.title,
+      rawRecognizedTitle: product.rawRecognizedTitle ?? "unknown",
+      cleanedProductName: product.cleanedProductName ?? "unknown",
       category: product.category,
       price: product.price,
       priceDisplay: product.priceDisplay ?? "unknown",
@@ -52,6 +54,7 @@ export function buildHotProductAnalysisUserPrompt(product: ProductInput): string
     "{",
     '  "preGenerationReport": {',
     '    "productBasics": {',
+    '      "rawRecognizedTitle": "原始识别标题，尽量完整保留图片/截图中识别到的完整标题",',
     '      "productName": "产品名称",',
     '      "productCategory": "产品类目",',
     '      "currentComposition": "当前产品组成",',
@@ -65,6 +68,10 @@ export function buildHotProductAnalysisUserPrompt(product: ProductInput): string
     '      "priceComparisonRisk": "低 | 中 | 高",',
     '      "transformationSpace": "低 | 中 | 高",',
     '      "imageExpressionSpace": "低 | 中 | 高",',
+    '      "skuDependency": "强依赖 | 中等依赖 | 弱依赖 | 不适用",',
+    '      "currentSkuInfo": "当前 SKU 信息：已识别内容或未提供",',
+    '      "skuConversionImpact": "高 | 中 | 低 | 不适用",',
+    '      "skuSuggestion": "是否需要补充颜色、尺码、规格、容量、型号等信息",',
     '      "oneSentenceJudgment": "一句话判断"',
     "    },",
     '    "planA": {',
@@ -128,6 +135,9 @@ export function buildHotProductAnalysisUserPrompt(product: ProductInput): string
     "- preGenerationReport.planA 和 preGenerationReport.planB 只能是两个方案。",
     "- 不要让报告承担真实利润判断，不要给出最终上架结论。",
     "- 不要教供应链，只列素材准备清单和图文生成资料。",
+    "- SKU 判断必须先看产品类目：狗背带、服装、鞋帽、饰品、宠物穿戴类通常强依赖颜色/尺码/规格；部分收纳、杯具、配件类可能中等依赖容量/型号/规格；天生单规格产品不要因为缺少颜色或尺码就判断为缺陷。",
+    "- 如果图片识别到颜色/尺码/规格，可作为 currentSkuInfo；识别不到时不要默认扣分，要结合品类判断 skuDependency 和 skuConversionImpact。",
+    "- productBasics.rawRecognizedTitle 用于溯源，允许保留品牌词；productBasics.productName、生图资料包和标题卖点资料包必须使用清洗后的通用产品名称，不要使用品牌词。",
     "- copyText 字段必须包含完整可复制文本，不要只写一句说明。生图资料包必须包含规格信息字段：主产品规格、配件规格、产品尺寸、包装重量、包装尺寸、颜色/尺码选项。",
     "- 所有字符串值必须是中文，商品原始英文标题可以在产品名称中保留。"
   ].join("\n");

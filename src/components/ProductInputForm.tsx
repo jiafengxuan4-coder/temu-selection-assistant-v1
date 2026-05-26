@@ -254,6 +254,8 @@ export function ProductInputForm({
 
     const signature = JSON.stringify({
       title: recognizedFields.title,
+      rawRecognizedTitle: recognizedFields.rawRecognizedTitle,
+      cleanedProductName: recognizedFields.cleanedProductName,
       category: recognizedFields.category,
       price: recognizedFields.price,
       priceDisplay: recognizedFields.priceDisplay,
@@ -264,6 +266,10 @@ export function ProductInputForm({
       monthlySales: recognizedFields.monthlySales,
       rating: recognizedFields.rating,
       reviewsText: recognizedFields.reviewsText,
+      recognizedSpecInfo: recognizedFields.recognizedSpecInfo,
+      recognizedSizeInfo: recognizedFields.recognizedSizeInfo,
+      recognizedColorStyleInfo: recognizedFields.recognizedColorStyleInfo,
+      recognizedWeightDimensionInfo: recognizedFields.recognizedWeightDimensionInfo,
       missingFields: recognizedFields.missingFields
     });
 
@@ -290,7 +296,7 @@ export function ProductInputForm({
       }
     };
 
-    fillTextField("title", recognizedFields.title);
+    fillTextField("title", recognizedFields.rawRecognizedTitle ?? recognizedFields.title);
     fillTextField("category", recognizedFields.category);
 
     if (nextState.price.trim().length === 0 && typeof recognizedFields.price === "number" && Number.isFinite(recognizedFields.price)) {
@@ -309,6 +315,10 @@ export function ProductInputForm({
     fillNumberField("monthlySales", recognizedFields.monthlySales);
     fillNumberField("rating", recognizedFields.rating);
     fillTextField("reviewsText", recognizedFields.reviewsText);
+    fillTextField("mainProductSpec", recognizedFields.recognizedSpecInfo);
+    fillTextField("productSize", recognizedFields.recognizedSizeInfo);
+    fillTextField("packageSize", recognizedFields.recognizedWeightDimensionInfo);
+    fillTextField("colorSizeOptions", recognizedFields.recognizedColorStyleInfo);
 
     const hasMissingFields = Boolean(recognizedFields.missingFields?.length);
     setAutofillMessage(

@@ -25,6 +25,8 @@ import type {
   ProductBasicsReport,
   RecommendationDirectionType,
   RecommendationLevel,
+  SkuConversionImpact,
+  SkuDependencyLevel,
   TitleSellingPointPackage
 } from "@/types/recommendation";
 
@@ -43,6 +45,8 @@ const recommendationLevels = ["priority_test", "small_batch_test", "cautious", "
 const packagingWorthValues = ["值得", "待观察", "不建议"] as const;
 const packagingProductTypeValues = ["标品", "半标品", "非标品", "混合型"] as const;
 const packagingLevelValues = ["低", "中", "高"] as const;
+const skuDependencyValues = ["强依赖", "中等依赖", "弱依赖", "不适用"] as const;
+const skuConversionImpactValues = ["高", "中", "低", "不适用"] as const;
 const materialRequirementValues = ["必须", "必须，如果有组合配件", "建议", "建议，部分品类必须", "可选"] as const;
 
 const boundaryReminder = "本报告只提供产品包装方向、组合建议、素材准备和 AI 图文生成资料，不代表最终上架建议。供货能力、真实成本、物流费用和利润结果，请卖家自行确认。";
@@ -102,6 +106,41 @@ function pickString(value: unknown, fallback: string): string {
   return sanitizeText(typeof value === "string" && value.trim().length > 0 ? value.trim() : fallback);
 }
 
+function isMeaningfulText(value: string | undefined): value is string {
+  if (!value) return false;
+
+  const normalized = value.trim().toLowerCase();
+  const invalidValues = new Set([
+    "",
+    "-",
+    "--",
+    "n/a",
+    "na",
+    "null",
+    "undefined",
+    "unknown",
+    "待补充",
+    "待补充产品名称",
+    "待补充类目",
+    "未知",
+    "未识别",
+    "未提供",
+    "无"
+  ]);
+
+  return !invalidValues.has(normalized);
+}
+
+function pickMeaningfulString(...values: Array<string | undefined>): string {
+  const matchedValue = values.find(isMeaningfulText);
+  return sanitizeText(matchedValue?.trim() || "未提供");
+}
+
+function pickOptionalMeaningfulString(...values: Array<string | undefined>): string | undefined {
+  const matchedValue = values.find(isMeaningfulText);
+  return matchedValue ? sanitizeText(matchedValue.trim()) : undefined;
+}
+
 function pickStringArray(value: unknown): string[] {
   return Array.isArray(value)
     ? value
@@ -123,11 +162,99 @@ function pickEnum<T extends readonly string[]>(value: unknown, allowedValues: T,
 }
 
 function formatProductName(product: ProductInput): string {
-  return product.title.trim() || "待补充产品名称";
+  return pickMeaningfulString(product.title, product.cleanedProductName, product.rawRecognizedTitle);
 }
 
 function formatProductCategory(product: ProductInput): string {
-  return product.category.trim() || "待补充类目";
+  return pickMeaningfulString(product.category);
+}
+
+function inferSkuAssessment(product: ProductInput): Pick<
+  PackagingValueReport,
+  "skuDependency" | "currentSkuInfo" | "skuConversionImpact" | "skuSuggestion"
+> {
+  const source = `${product.title} ${product.category} ${product.cleanedProductName ?? ""}`.toLowerCase();
+  const specs = product.productSpecs;
+  const skuInfo = [
+    specs?.colorSizeOptions ? `颜色/尺码选项：${specs.colorSizeOptions}` : "",
+    specs?.mainProductSpec ? `主产品规格：${specs.mainProductSpec}` : "",
+    specs?.productSize ? `产品尺寸：${specs.productSize}` : ""
+  ].filter(Boolean).join("；") || "未提供";
+  const strongSkuKeywords = [
+    "dog harness",
+    "harness",
+    "pet wearable",
+    "clothing",
+    "dress",
+    "shirt",
+    "shoes",
+    "hat",
+    "bra",
+    "underwear",
+    "ring",
+    "necklace",
+    "bracelet",
+    "狗背带",
+    "宠物穿戴",
+    "服装",
+    "女装",
+    "男装",
+    "鞋",
+    "帽",
+    "内衣",
+    "文胸",
+    "饰品",
+    "戒指",
+    "项链"
+  ];
+  const mediumSkuKeywords = [
+    "leash",
+    "collar",
+    "bag",
+    "bottle",
+    "storage",
+    "capacity",
+    "model",
+    "牵引绳",
+    "项圈",
+    "包",
+    "水杯",
+    "收纳",
+    "容量",
+    "型号",
+    "规格"
+  ];
+
+  if (strongSkuKeywords.some((keyword) => source.includes(keyword))) {
+    return {
+      skuDependency: "强依赖",
+      currentSkuInfo: skuInfo,
+      skuConversionImpact: skuInfo === "未提供" ? "中" : "高",
+      skuSuggestion: skuInfo === "未提供"
+        ? "该品类通常依赖颜色、尺码或规格选项，建议补充可选颜色、尺码、型号或适用对象信息。"
+        : "当前 SKU 信息可用于判断颜色/尺码丰富度和图文表达方向，建议核对是否覆盖主流选择。"
+    };
+  }
+
+  if (mediumSkuKeywords.some((keyword) => source.includes(keyword))) {
+    return {
+      skuDependency: "中等依赖",
+      currentSkuInfo: skuInfo,
+      skuConversionImpact: skuInfo === "未提供" ? "低" : "中",
+      skuSuggestion: skuInfo === "未提供"
+        ? "可根据实际产品补充规格、容量、型号、颜色或适用对象，但不应强行编造。"
+        : "已有 SKU 或规格信息可作为详情图和规格图参考。"
+    };
+  }
+
+  return {
+    skuDependency: "弱依赖",
+    currentSkuInfo: skuInfo,
+    skuConversionImpact: skuInfo === "未提供" ? "不适用" : "低",
+    skuSuggestion: skuInfo === "未提供"
+      ? "该类产品未必依赖多颜色或多尺码，不应因缺少颜色/尺码选项直接判断为缺陷。"
+      : "可保留已提供规格信息用于图文资料，但无需强行生成颜色/尺码图。"
+  };
 }
 
 function formatSpecsLines(product: ProductInput): string[] {
@@ -309,6 +436,7 @@ function buildTitlePackageCopyText(pkg: Omit<TitleSellingPointPackage, "copyText
 function createDefaultPreGenerationReport(product: ProductInput): PreGenerationReport {
   const productName = formatProductName(product);
   const productCategory = formatProductCategory(product);
+  const skuAssessment = inferSkuAssessment(product);
   const planA: PrimaryCombinationPlan = {
     combinationName: `${productName} 场景组合优先测试方案`,
     combinationContent: "主产品 + 相关配件 + 场景化使用补充件",
@@ -360,6 +488,7 @@ function createDefaultPreGenerationReport(product: ProductInput): PreGenerationR
 
   return {
     productBasics: {
+      rawRecognizedTitle: product.rawRecognizedTitle,
       productName,
       productCategory,
       currentComposition: "主产品为核心，配件关系需要根据上传图片和供应链素材进一步确认。",
@@ -373,6 +502,10 @@ function createDefaultPreGenerationReport(product: ProductInput): PreGenerationR
       priceComparisonRisk: "中",
       transformationSpace: "中",
       imageExpressionSpace: "中",
+      skuDependency: skuAssessment.skuDependency,
+      currentSkuInfo: skuAssessment.currentSkuInfo,
+      skuConversionImpact: skuAssessment.skuConversionImpact,
+      skuSuggestion: skuAssessment.skuSuggestion,
       oneSentenceJudgment: "当前产品可以先围绕组合、配件和场景表达做小范围测试，但不代表最终上架建议。"
     },
     planA,
@@ -394,8 +527,19 @@ function createDefaultPreGenerationReport(product: ProductInput): PreGenerationR
 function mapPreGenerationReport(raw: AIPreGenerationRawOutput | undefined, product: ProductInput): PreGenerationReport {
   const fallback = createDefaultPreGenerationReport(product);
   const productBasics: ProductBasicsReport = {
-    productName: pickString(raw?.productBasics?.productName, fallback.productBasics.productName),
-    productCategory: pickString(raw?.productBasics?.productCategory, fallback.productBasics.productCategory),
+    rawRecognizedTitle: pickOptionalMeaningfulString(product.rawRecognizedTitle, pickString(raw?.productBasics?.rawRecognizedTitle, "")),
+    productName: pickMeaningfulString(
+      product.title,
+      product.cleanedProductName,
+      product.rawRecognizedTitle,
+      pickString(raw?.productBasics?.productName, ""),
+      fallback.productBasics.productName
+    ),
+    productCategory: pickMeaningfulString(
+      product.category,
+      pickString(raw?.productBasics?.productCategory, ""),
+      fallback.productBasics.productCategory
+    ),
     currentComposition: pickString(raw?.productBasics?.currentComposition, fallback.productBasics.currentComposition),
     mainUse: pickString(raw?.productBasics?.mainUse, fallback.productBasics.mainUse),
     targetUsers: pickString(raw?.productBasics?.targetUsers, fallback.productBasics.targetUsers),
@@ -407,6 +551,10 @@ function mapPreGenerationReport(raw: AIPreGenerationRawOutput | undefined, produ
     priceComparisonRisk: pickEnum(raw?.packagingValue?.priceComparisonRisk, packagingLevelValues, fallback.packagingValue.priceComparisonRisk) as PackagingLevel,
     transformationSpace: pickEnum(raw?.packagingValue?.transformationSpace, packagingLevelValues, fallback.packagingValue.transformationSpace) as PackagingLevel,
     imageExpressionSpace: pickEnum(raw?.packagingValue?.imageExpressionSpace, packagingLevelValues, fallback.packagingValue.imageExpressionSpace) as PackagingLevel,
+    skuDependency: pickEnum(raw?.packagingValue?.skuDependency, skuDependencyValues, fallback.packagingValue.skuDependency) as SkuDependencyLevel,
+    currentSkuInfo: pickString(raw?.packagingValue?.currentSkuInfo, fallback.packagingValue.currentSkuInfo),
+    skuConversionImpact: pickEnum(raw?.packagingValue?.skuConversionImpact, skuConversionImpactValues, fallback.packagingValue.skuConversionImpact) as SkuConversionImpact,
+    skuSuggestion: pickString(raw?.packagingValue?.skuSuggestion, fallback.packagingValue.skuSuggestion),
     oneSentenceJudgment: pickString(raw?.packagingValue?.oneSentenceJudgment, fallback.packagingValue.oneSentenceJudgment)
   };
   const planA: PrimaryCombinationPlan = {

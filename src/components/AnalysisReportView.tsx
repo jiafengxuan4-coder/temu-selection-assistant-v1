@@ -98,7 +98,11 @@ function CopyPackageButton({ label, text }: CopyPackageButtonProps) {
 
 function formatProductPrice(report: AnalysisReport): string {
   const priceDisplay = report.input.priceDisplay?.trim();
-  return priceDisplay && priceDisplay.length > 0 ? priceDisplay : String(report.input.price);
+  if (priceDisplay && priceDisplay.length > 0) {
+    return priceDisplay;
+  }
+
+  return Number.isFinite(report.input.price) && report.input.price > 0 ? String(report.input.price) : "未提供";
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
@@ -165,7 +169,10 @@ export function AnalysisReportView({
       <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <h3 className="text-lg font-semibold text-slate-950">一、产品基础识别</h3>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <InfoRow label="产品名称" value={pre.productBasics.productName} />
+          {pre.productBasics.rawRecognizedTitle || report.input.rawRecognizedTitle ? (
+            <InfoRow label="原始识别标题" value={pre.productBasics.rawRecognizedTitle ?? report.input.rawRecognizedTitle ?? "未识别"} />
+          ) : null}
+          <InfoRow label="清洗后产品名称" value={pre.productBasics.productName} />
           <InfoRow label="产品类目" value={pre.productBasics.productCategory} />
           <InfoRow label="商品价格" value={formatProductPrice(report)} />
           <InfoRow label="当前产品组成" value={pre.productBasics.currentComposition} />
@@ -183,6 +190,10 @@ export function AnalysisReportView({
           <InfoRow label="比价风险" value={pre.packagingValue.priceComparisonRisk} />
           <InfoRow label="可变形空间" value={pre.packagingValue.transformationSpace} />
           <InfoRow label="图片表达空间" value={pre.packagingValue.imageExpressionSpace} />
+          <InfoRow label="SKU 依赖程度" value={pre.packagingValue.skuDependency} />
+          <InfoRow label="当前 SKU 信息" value={pre.packagingValue.currentSkuInfo} />
+          <InfoRow label="SKU 对转化影响" value={pre.packagingValue.skuConversionImpact} />
+          <InfoRow label="规格选项建议" value={pre.packagingValue.skuSuggestion} />
           <InfoRow label="一句话判断" value={pre.packagingValue.oneSentenceJudgment} />
         </div>
       </section>

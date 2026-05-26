@@ -42,9 +42,12 @@ export type RecommendationDirection = {
 export type PackagingWorth = "值得" | "待观察" | "不建议";
 export type PackagingProductType = "标品" | "半标品" | "非标品" | "混合型";
 export type PackagingLevel = "低" | "中" | "高";
+export type SkuDependencyLevel = "强依赖" | "中等依赖" | "弱依赖" | "不适用";
+export type SkuConversionImpact = "高" | "中" | "低" | "不适用";
 export type MaterialRequirement = "必须" | "必须，如果有组合配件" | "建议" | "建议，部分品类必须" | "可选";
 
 export type ProductBasicsReport = {
+  rawRecognizedTitle?: string;
   productName: string;
   productCategory: string;
   currentComposition: string;
@@ -59,6 +62,10 @@ export type PackagingValueReport = {
   priceComparisonRisk: PackagingLevel;
   transformationSpace: PackagingLevel;
   imageExpressionSpace: PackagingLevel;
+  skuDependency: SkuDependencyLevel;
+  currentSkuInfo: string;
+  skuConversionImpact: SkuConversionImpact;
+  skuSuggestion: string;
   oneSentenceJudgment: string;
 };
 

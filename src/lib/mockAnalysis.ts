@@ -86,7 +86,7 @@ function createMockImageRecognition(product: ProductInput): ImageRecognitionResu
   return {
     ...baseResult,
     productType: product.category || "待识别产品",
-    category: product.category || "待补充类目",
+    category: product.category || "未提供",
     mainColors: ["未知"],
     productStructure: "single",
     standardizationLevel: "unknown",
@@ -182,8 +182,8 @@ function getFinalConclusion(recommendations: RecommendationDirection[]): string 
 }
 
 function createMockPreGenerationReport(product: ProductInput): AnalysisReport["preGenerationReport"] {
-  const productName = product.title || "待补充产品名称";
-  const productCategory = product.category || "待补充类目";
+  const productName = product.title || product.cleanedProductName || product.rawRecognizedTitle || "未提供";
+  const productCategory = product.category || "未提供";
   const hasImages = Boolean(product.images?.length || product.imageFileName || product.imageUrl);
   const planA = {
     combinationName: `${productName} 场景组合优先测试方案`,
@@ -249,6 +249,12 @@ function createMockPreGenerationReport(product: ProductInput): AnalysisReport["p
       priceComparisonRisk: "中",
       transformationSpace: "中",
       imageExpressionSpace: "中",
+      skuDependency: "中等依赖",
+      currentSkuInfo: product.productSpecs?.colorSizeOptions || product.productSpecs?.mainProductSpec || "未提供",
+      skuConversionImpact: product.productSpecs?.colorSizeOptions || product.productSpecs?.mainProductSpec ? "中" : "低",
+      skuSuggestion: product.productSpecs?.colorSizeOptions || product.productSpecs?.mainProductSpec
+        ? "已有 SKU 或规格信息可作为详情图和规格图参考。"
+        : "需结合品类判断是否需要补充颜色、尺码、规格、容量或型号；不应把所有产品都按颜色/尺码缺失处理。",
       oneSentenceJudgment: "当前产品可以先围绕组合、配件和场景表达做小范围测试，但不代表最终上架建议。"
     },
     planA,

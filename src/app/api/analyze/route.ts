@@ -47,6 +47,22 @@ function parseProductSpecs(value: unknown): ProductInput["productSpecs"] | undef
 
   return Object.values(productSpecs).some(Boolean) ? productSpecs : undefined;
 }
+
+function mergeProductSpecs(
+  manualSpecs: ProductInput["productSpecs"],
+  recognizedProduct: RecognizedProductFields | null
+): ProductInput["productSpecs"] | undefined {
+  const productSpecs = {
+    mainProductSpec: manualSpecs?.mainProductSpec ?? recognizedProduct?.recognizedSpecInfo,
+    accessorySpec: manualSpecs?.accessorySpec,
+    productSize: manualSpecs?.productSize ?? recognizedProduct?.recognizedSizeInfo,
+    packageWeight: manualSpecs?.packageWeight,
+    packageSize: manualSpecs?.packageSize ?? recognizedProduct?.recognizedWeightDimensionInfo,
+    colorSizeOptions: manualSpecs?.colorSizeOptions ?? recognizedProduct?.recognizedColorStyleInfo
+  };
+
+  return Object.values(productSpecs).some(Boolean) ? productSpecs : undefined;
+}
 function parseImageInputs(value: unknown): ProductImageInput[] {
   if (!Array.isArray(value)) {
     return [];
@@ -232,6 +248,8 @@ function parseProduct(value: Record<string, unknown>): ProductInput | null {
     monthlySales: parseOptionalNumber(value.monthlySales),
     rating: parseOptionalNumber(value.rating),
     reviewsText: parseOptionalString(value.reviewsText),
+    rawRecognizedTitle: parseOptionalString(value.rawRecognizedTitle),
+    cleanedProductName: parseOptionalString(value.cleanedProductName),
     productSpecs: parseProductSpecs(value.productSpecs),
     imageUrl: parseOptionalString(value.imageUrl),
     imageFileName: parseOptionalString(value.imageFileName),
@@ -245,10 +263,16 @@ function mergeRecognizedProduct(
   rawProduct: Record<string, unknown>,
   recognizedProduct: RecognizedProductFields | null
 ): Record<string, unknown> {
-  const title = parseOptionalString(rawProduct.title) || recognizedProduct?.title;
+  const title = parseOptionalString(rawProduct.title)
+    || recognizedProduct?.cleanedProductName
+    || recognizedProduct?.rawRecognizedTitle
+    || recognizedProduct?.title;
   const manualCategory = parseOptionalString(rawProduct.category);
   const inferredCategory = recognizedProduct?.inferredCategory
-    ?? inferCategoryFromProductInfo({ title, recognizedTitle: recognizedProduct?.title });
+    ?? inferCategoryFromProductInfo({
+      title,
+      recognizedTitle: recognizedProduct?.rawRecognizedTitle ?? recognizedProduct?.title
+    });
   const category = manualCategory || recognizedProduct?.category || inferredCategory;
   const categorySource = manualCategory
     ? "manual"
@@ -261,6 +285,8 @@ function mergeRecognizedProduct(
     category,
     inferredCategory,
     categorySource,
+    rawRecognizedTitle: recognizedProduct?.rawRecognizedTitle,
+    cleanedProductName: recognizedProduct?.cleanedProductName,
     price: parsePositiveNumber(rawProduct.price) ?? recognizedProduct?.price,
     priceDisplay: parseOptionalString(rawProduct.priceDisplay)
       || (hasManualPrice(rawProduct.price) ? undefined : recognizedProduct?.priceDisplay),
@@ -272,7 +298,7 @@ function mergeRecognizedProduct(
     monthlySales: parseOptionalNumber(rawProduct.monthlySales) ?? recognizedProduct?.monthlySales,
     rating: parseOptionalNumber(rawProduct.rating) ?? recognizedProduct?.rating,
     reviewsText: parseOptionalString(rawProduct.reviewsText) || recognizedProduct?.reviewsText,
-    productSpecs: parseProductSpecs(rawProduct.productSpecs),
+    productSpecs: mergeProductSpecs(parseProductSpecs(rawProduct.productSpecs), recognizedProduct),
     imageUrl: parseOptionalString(rawProduct.imageUrl),
     imageFileName: parseOptionalString(rawProduct.imageFileName),
     imageBase64: parseOptionalString(rawProduct.imageBase64),
@@ -305,6 +331,9 @@ function toRecognizedFieldsSummary(
 
   return {
     title: recognizedProduct.title,
+    rawRecognizedTitle: recognizedProduct.rawRecognizedTitle,
+    rawRecognizedDescription: recognizedProduct.rawRecognizedDescription,
+    cleanedProductName: recognizedProduct.cleanedProductName,
     category: recognizedProduct.category,
     inferredCategory: recognizedProduct.inferredCategory,
     categorySource: recognizedProduct.categorySource,
@@ -321,7 +350,11 @@ function toRecognizedFieldsSummary(
     confidence: recognizedProduct.confidence ?? "unknown",
     missingFields,
     warnings,
-    imageCount: recognizedProduct.imageCount
+    imageCount: recognizedProduct.imageCount,
+    recognizedSpecInfo: recognizedProduct.recognizedSpecInfo,
+    recognizedSizeInfo: recognizedProduct.recognizedSizeInfo,
+    recognizedColorStyleInfo: recognizedProduct.recognizedColorStyleInfo,
+    recognizedWeightDimensionInfo: recognizedProduct.recognizedWeightDimensionInfo
   };
 }
 
@@ -376,6 +409,8 @@ export async function POST(request: NextRequest) {
       monthlySales: product.monthlySales,
       rating: product.rating,
       reviewsText: product.reviewsText,
+      rawRecognizedTitle: product.rawRecognizedTitle,
+      cleanedProductName: product.cleanedProductName,
       productSpecs: product.productSpecs,
       imageUrl: product.imageUrl,
       imageFileName: product.imageFileName
