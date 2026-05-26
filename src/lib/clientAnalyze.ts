@@ -1,4 +1,4 @@
-import { generateMockAnalysisReport } from "@/lib/mockAnalysis";
+﻿import { generateMockAnalysisReport } from "@/lib/mockAnalysis";
 import type { AnalyzeProductResponse } from "@/types/ai";
 import type { ProductInput, RecognizedProductFields } from "@/types/product";
 import type { AnalysisReport } from "@/types/recommendation";
@@ -20,6 +20,10 @@ function fallbackToMock(product: ProductInput, message: string): ClientAnalysisR
   };
 }
 
+function isAnalyzeProductResponse(value: unknown): value is AnalyzeProductResponse {
+  return typeof value === "object" && value !== null && "ok" in value;
+}
+
 export async function analyzeProductFromClient(
   product: ProductInput
 ): Promise<ClientAnalysisResult> {
@@ -32,12 +36,26 @@ export async function analyzeProductFromClient(
       body: JSON.stringify({ product })
     });
 
+    const responseText = await response.text();
     let result: AnalyzeProductResponse | null = null;
 
     try {
-      result = (await response.json()) as AnalyzeProductResponse;
+      const parsed = JSON.parse(responseText) as unknown;
+      result = isAnalyzeProductResponse(parsed) ? parsed : null;
     } catch {
-      return fallbackToMock(product, "分析接口返回异常，已使用 Mock 兜底分析。");
+      return {
+        report: null,
+        source: "mock_fallback",
+        message: `分析接口返回内容无法解析，请重试。HTTP 状态：${response.status}。`
+      };
+    }
+
+    if (!result) {
+      return {
+        report: null,
+        source: "mock_fallback",
+        message: `分析接口返回结构异常，请重试。HTTP 状态：${response.status}。`
+      };
     }
 
     if (result.ok) {
@@ -55,13 +73,18 @@ export async function analyzeProductFromClient(
       return {
         report: null,
         source: "mock_fallback",
-        message: result.error || "截图识别不完整，请手动补充商品标题、类目和价格。",
+        message: result.error || "图片识别不完整，请手动补充商品标题、类目和价格。",
         recognizedFields: result.recognizedFields
       };
     }
 
-    return fallbackToMock(product, result.error || "API 暂不可用，已使用 Mock 兜底分析。");
-  } catch {
-    return fallbackToMock(product, "分析接口暂不可用，已使用 Mock 兜底分析。");
+    return fallbackToMock(product, `API 返回错误，已显示演示数据。原因：${result.error || "接口暂不可用"}`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "网络请求失败";
+    const timeoutMessage = message.toLowerCase().includes("abort") || message.includes("超时")
+      ? "请求超时，已显示演示数据。请减少图片数量或手动补充基础字段后重试。"
+      : `分析接口暂不可用，已显示演示数据。原因：${message}`;
+
+    return fallbackToMock(product, timeoutMessage);
   }
 }

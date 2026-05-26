@@ -9,6 +9,23 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+function createRequestId(): string {
+  return Math.random().toString(36).slice(2, 8);
+}
+
+function estimateBase64ImageSize(imageBase64: string): number {
+  const base64 = imageBase64.includes(",") ? imageBase64.split(",").pop() ?? "" : imageBase64;
+  const padding = base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0;
+  return Math.max(0, Math.round((base64.length * 3) / 4 - padding));
+}
+
+function getImageSizeSummaries(images: ProductImageInput[]): string[] {
+  return images.map((image, index) => {
+    const sizeMb = estimateBase64ImageSize(image.imageBase64) / 1024 / 1024;
+    return `image${index + 1}:${sizeMb.toFixed(2)}MB`;
+  });
+}
+
 function parseOptionalNumber(value: unknown): number | undefined {
   if (typeof value === "number" && Number.isFinite(value)) {
     return value;
@@ -224,6 +241,31 @@ function buildMissingProductMessage(missingFields: string[], hasSubmittedImages:
     : `请求体缺少${missingFields.join("、")}，请补充后再生成报告。`;
 }
 
+function getFinalProductSources(
+  rawProduct: Record<string, unknown>,
+  recognizedProduct: RecognizedProductFields | null
+) {
+  return {
+    productNameSource: parseOptionalString(rawProduct.title)
+      ? "manual"
+      : recognizedProduct?.cleanedProductName || recognizedProduct?.rawRecognizedTitle || recognizedProduct?.title
+        ? "image_recognition"
+        : "ai_fallback",
+    categorySource: parseOptionalString(rawProduct.category)
+      ? "manual"
+      : recognizedProduct?.categorySource === "inferred"
+        ? "inferred"
+        : recognizedProduct?.category
+          ? "image_recognition"
+          : "ai_fallback",
+    priceSource: hasManualPrice(rawProduct.price)
+      ? "manual"
+      : typeof recognizedProduct?.price === "number"
+        ? "image_recognition"
+        : "ai_fallback"
+  };
+}
+
 
 function parseProduct(value: Record<string, unknown>): ProductInput | null {
   const title = parseOptionalString(value.title);
@@ -359,39 +401,87 @@ function toRecognizedFieldsSummary(
 }
 
 export async function POST(request: NextRequest) {
+  const requestId = createRequestId();
+  const startedAt = Date.now();
   let body: AnalyzeProductRequest | null = null;
 
   try {
     body = (await request.json()) as AnalyzeProductRequest;
   } catch {
+    console.warn("[ANALYZE_REQUEST_INVALID_JSON]", { requestId });
     return jsonResponse({ ok: false, error: "请求体必须是合法 JSON。" }, 400);
   }
 
   const rawProduct = isRecord(body) && isRecord(body.product) ? body.product : null;
 
   if (!rawProduct) {
+    console.warn("[ANALYZE_REQUEST_MISSING_PRODUCT]", { requestId });
     return jsonResponse({ ok: false, error: "请求体缺少 product。" }, 400);
   }
 
   const imageInputs = parseImageInputs(rawProduct.images);
   const imageBase64 = parseOptionalString(rawProduct.imageBase64);
+  const legacyImageInput = imageBase64
+    ? [{
+        imageBase64,
+        imageMimeType: parseOptionalString(rawProduct.imageMimeType) || "image/png",
+        imageFileName: parseOptionalString(rawProduct.imageFileName) || "product-screenshot"
+      }]
+    : [];
+  const submittedImageInputs = imageInputs.length > 0 ? imageInputs : legacyImageInput;
   const hasSubmittedImages = imageInputs.length > 0 || Boolean(imageBase64);
+  console.info("[ANALYZE_REQUEST_START]", {
+    requestId,
+    imageCount: submittedImageInputs.length,
+    imageSizes: getImageSizeSummaries(submittedImageInputs),
+    hasManualTitle: Boolean(parseOptionalString(rawProduct.title)),
+    hasManualCategory: Boolean(parseOptionalString(rawProduct.category)),
+    hasManualPrice: hasManualPrice(rawProduct.price),
+    enteredImageRecognition: hasSubmittedImages
+  });
+
   const rawRecognizedProduct = imageInputs.length > 0
-    ? await recognizeProductFromImages(imageInputs)
+    ? await recognizeProductFromImages(imageInputs, { requestId })
     : imageBase64
       ? await recognizeProductFromImage({
           imageBase64,
           imageMimeType: parseOptionalString(rawProduct.imageMimeType),
-          imageFileName: parseOptionalString(rawProduct.imageFileName)
+          imageFileName: parseOptionalString(rawProduct.imageFileName),
+          requestId
         })
       : null;
   const recognizedProduct = normalizeRecognizedProduct(rawRecognizedProduct);
+  console.info("[ANALYZE_RECOGNITION_RESULT]", {
+    requestId,
+    imageRecognitionAttempted: hasSubmittedImages,
+    hasTitle: Boolean(recognizedProduct?.title),
+    hasRawRecognizedTitle: Boolean(recognizedProduct?.rawRecognizedTitle),
+    hasCategory: Boolean(recognizedProduct?.category),
+    hasPrice: typeof recognizedProduct?.price === "number",
+    missingFields: recognizedProduct?.missingFields ?? []
+  });
+
   const mergedProduct = mergeRecognizedProduct(rawProduct, recognizedProduct);
   const product = parseProduct(mergedProduct);
+  const finalSources = getFinalProductSources(rawProduct, recognizedProduct);
+  console.info("[ANALYZE_MERGED_PRODUCT]", {
+    requestId,
+    productNameSource: finalSources.productNameSource,
+    categorySource: finalSources.categorySource,
+    priceSource: finalSources.priceSource,
+    hasFinalProductName: Boolean(parseOptionalString(mergedProduct.title)),
+    hasFinalCategory: Boolean(parseOptionalString(mergedProduct.category)),
+    hasFinalPrice: typeof parsePositiveNumber(mergedProduct.price) === "number"
+  });
 
   if (!product) {
     const missingFields = getMissingProductFields(mergedProduct);
     const error = buildMissingProductMessage(missingFields, hasSubmittedImages);
+    console.warn("[ANALYZE_REQUEST_BLOCKED]", {
+      requestId,
+      missingFields,
+      durationMs: Date.now() - startedAt
+    });
 
     return jsonResponse({ ok: false, error, recognizedFields: toRecognizedFieldsSummary(recognizedProduct) }, 400);
   }
@@ -418,6 +508,15 @@ export async function POST(request: NextRequest) {
     const result = await analyzeHotProductWithAI(analysisProduct);
     const imageMessage = hasSubmittedImages ? "已接收上传图片，并作为产品参考素材参与分析。图片识别结果仅作辅助，报告优先使用手动填写的信息。" : "";
     const message = [result.message, imageMessage].filter(Boolean).join(" ");
+    console.info("[ANALYZE_REQUEST_DONE]", {
+      requestId,
+      source: result.source,
+      imageCount: submittedImageInputs.length,
+      productNameSource: finalSources.productNameSource,
+      categorySource: finalSources.categorySource,
+      priceSource: finalSources.priceSource,
+      durationMs: Date.now() - startedAt
+    });
 
     return jsonResponse(
       {
@@ -431,6 +530,11 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : "分析失败，请稍后重试。";
+    console.warn("[ANALYZE_REQUEST_FAILED]", {
+      requestId,
+      message,
+      durationMs: Date.now() - startedAt
+    });
 
     return jsonResponse({ ok: false, error: message }, 400);
   }

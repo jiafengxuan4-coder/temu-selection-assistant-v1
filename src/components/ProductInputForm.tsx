@@ -575,7 +575,7 @@ export function ProductInputForm({
         disabled={isSubmitting}
         className="mt-5 w-full rounded-md bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
       >
-        {isSubmitting ? "正在生成报告..." : "生成差异化选品报告"}
+        {isSubmitting ? "正在生成报告，图片较多时可能需要 60-90 秒..." : "生成差异化选品报告"}
       </button>
     </form>
   );

@@ -11,6 +11,11 @@ type RecognizeProductFromImageInput = {
   imageBase64: string;
   imageMimeType?: string;
   imageFileName?: string;
+  requestId?: string;
+};
+
+type RecognitionLogContext = {
+  requestId?: string;
 };
 
 function cleanJsonText(rawText: string): string {
@@ -513,7 +518,8 @@ function buildRecognitionPrompt(imageCount: number): string {
 export async function recognizeProductFromImage({
   imageBase64,
   imageMimeType,
-  imageFileName
+  imageFileName,
+  requestId
 }: RecognizeProductFromImageInput): Promise<RecognizedProductFields> {
   return recognizeProductFromImages([
     {
@@ -521,19 +527,28 @@ export async function recognizeProductFromImage({
       imageMimeType: imageMimeType || "image/png",
       imageFileName: imageFileName || "product-screenshot"
     }
-  ]);
+  ], { requestId });
 }
 
 export async function recognizeProductFromImages(
-  images: ProductImageInput[]
+  images: ProductImageInput[],
+  context: RecognitionLogContext = {}
 ): Promise<RecognizedProductFields> {
   const limitedImages = images.slice(0, 10);
 
   if (limitedImages.length === 0) {
+    console.info("[IMAGE_RECOGNITION_SKIPPED]", {
+      requestId: context.requestId,
+      reason: "no_images"
+    });
     return fallbackRecognition("未提供商品截图", 0);
   }
 
   try {
+    console.info("[IMAGE_RECOGNITION_START]", {
+      requestId: context.requestId,
+      imageCount: limitedImages.length
+    });
     const config = getAIProviderConfig();
     const provider = getAIProvider(config.provider);
     const visionConfig = {
@@ -563,12 +578,60 @@ export async function recognizeProductFromImages(
         content
       }
     ];
-    const response = await provider.chatCompletion(messages, visionConfig);
+    let responseText = "";
 
-    return parseRecognizedFields(response.text, limitedImages.length);
+    try {
+      const response = await provider.chatCompletion(messages, visionConfig);
+      responseText = response.text;
+      console.info("[IMAGE_RECOGNITION_PROVIDER_SUCCESS]", {
+        requestId: context.requestId,
+        provider: config.provider,
+        model: visionConfig.model,
+        textLength: responseText.length
+      });
+    } catch (error) {
+      const record = typeof error === "object" && error !== null ? error as Record<string, unknown> : {};
+      const message = error instanceof Error ? error.message : "图片识别 API 调用失败";
+      console.warn("[IMAGE_RECOGNITION_PROVIDER_FAILED]", {
+        requestId: context.requestId,
+        provider: config.provider,
+        model: visionConfig.model,
+        code: typeof record.code === "string" ? record.code : undefined,
+        status: typeof record.status === "number" ? record.status : undefined,
+        message
+      });
+
+      return fallbackRecognition(message, limitedImages.length);
+    }
+
+    try {
+      const recognizedFields = parseRecognizedFields(responseText, limitedImages.length);
+      console.info("[IMAGE_RECOGNITION_PARSE_SUCCESS]", {
+        requestId: context.requestId,
+        hasTitle: Boolean(recognizedFields.title),
+        hasRawRecognizedTitle: Boolean(recognizedFields.rawRecognizedTitle),
+        hasCategory: Boolean(recognizedFields.category),
+        hasPrice: typeof recognizedFields.price === "number",
+        missingFields: recognizedFields.missingFields ?? []
+      });
+
+      return recognizedFields;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "图片识别 JSON 解析失败";
+      console.warn("[IMAGE_RECOGNITION_PARSE_FAILED]", {
+        requestId: context.requestId,
+        provider: config.provider,
+        model: visionConfig.model,
+        message,
+        textLength: responseText.length
+      });
+
+      return fallbackRecognition(message, limitedImages.length);
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : "图片识别未得到完整商品信息";
     console.warn("[IMAGE_RECOGNITION_FALLBACK]", {
+      requestId: context.requestId,
       errorType: "image_recognition",
       message
     });
