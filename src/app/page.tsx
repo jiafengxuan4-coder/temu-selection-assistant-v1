@@ -14,7 +14,7 @@ import type { ProductInput, RecognizedProductFields } from "@/types/product";
 import type { AnalysisReport } from "@/types/recommendation";
 
 const authorizedPhoneStorageKey = "temu_selection_authorized_phone";
-const founderAvatarPath = "/brand/xiaohuojian-avatar.jpg";
+const founderAvatarPath = "/xiaohuojian-avatar.jpg";
 
 type PhoneAuthResponse =
   | { ok: true; phone: string; message?: string }
