@@ -116,6 +116,30 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+function getProviderFromMessage(message: string | undefined): string | undefined {
+  if (!message) {
+    return undefined;
+  }
+
+  const match = message.match(/当前 provider[:：]\s*([a-zA-Z0-9_-]+)/);
+  return match?.[1];
+}
+
+function getDefaultTextModel(provider: string | undefined): string {
+  switch (provider) {
+    case "qwen":
+      return "qwen3.6-plus";
+    case "openai":
+      return "gpt-4.1-mini";
+    case "doubao":
+      return "doubao-seed-1-6";
+    case "deepseek":
+      return "deepseek-chat";
+    default:
+      return "未识别";
+  }
+}
+
 export function AnalysisReportView({
   report,
   onReanalyze,
@@ -128,6 +152,9 @@ export function AnalysisReportView({
   const [selectedPackagePlan, setSelectedPackagePlan] = useState<PackagePlanSelection>("A");
   const imagePackageText = formatImageGenerationPackage(report, selectedPackagePlan);
   const titlePackageText = formatTitleSellingPointPackage(report, selectedPackagePlan);
+  const displayProvider = modelInfo?.provider || getProviderFromMessage(analysisMessage) || "unknown";
+  const displayTextModel = modelInfo?.textModel || getDefaultTextModel(displayProvider);
+  const displayVisionModel = modelInfo?.visionModel || "qwen-vl-plus";
 
   return (
     <div className="space-y-5">
@@ -149,13 +176,11 @@ export function AnalysisReportView({
                     {analysisSource === "mock_fallback" ? `原因：${analysisMessage}` : analysisMessage}
                   </p>
                 ) : null}
-                {modelInfo ? (
-                  <div className="mt-2 grid gap-1 text-xs text-slate-500 sm:grid-cols-3">
-                    <p>当前 provider：{modelInfo.provider}</p>
-                    <p>文本分析模型：{modelInfo.textModel}</p>
-                    <p>截图识别模型：{modelInfo.visionModel}</p>
-                  </div>
-                ) : null}
+                <div className="mt-2 grid gap-1 text-xs text-slate-500 sm:grid-cols-3">
+                  <p>当前 provider：{displayProvider}</p>
+                  <p>文本分析模型：{displayTextModel}</p>
+                  <p>截图识别模型：{displayVisionModel}</p>
+                </div>
               </div>
             ) : null}
           </div>
