@@ -1,5 +1,6 @@
 ﻿import { NextResponse, type NextRequest } from "next/server";
 import { analyzeHotProductWithAI } from "@/lib/ai/analyzeHotProductWithAI";
+import { getAIProviderRuntimeInfo } from "@/lib/ai/providers";
 import { recognizeProductFromImage, recognizeProductFromImages } from "@/lib/ai/recognizeProductFromImage";
 import { inferCategoryFromProductInfo } from "@/lib/inferCategory";
 import type { AnalyzeProductRequest, AnalyzeProductResponse } from "@/types/ai";
@@ -403,6 +404,7 @@ function toRecognizedFieldsSummary(
 export async function POST(request: NextRequest) {
   const requestId = createRequestId();
   const startedAt = Date.now();
+  const modelInfo = getAIProviderRuntimeInfo();
   let body: AnalyzeProductRequest | null = null;
 
   try {
@@ -524,7 +526,8 @@ export async function POST(request: NextRequest) {
         data: result.report,
         source: result.source,
         message,
-        recognizedFields: toRecognizedFieldsSummary(recognizedProduct)
+        recognizedFields: toRecognizedFieldsSummary(recognizedProduct),
+        modelInfo
       },
       200
     );

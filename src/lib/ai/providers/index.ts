@@ -67,4 +67,16 @@ export function getAIProvider(provider: AIProviderName): AIProvider {
   return PROVIDERS[provider];
 }
 
+export function getAIProviderRuntimeInfo() {
+  const providerValue = process.env.AI_PROVIDER ?? "openai";
+  const provider = isAIProviderName(providerValue) ? providerValue : "openai";
+  const defaults = DEFAULT_CONFIG[provider];
+
+  return {
+    provider,
+    textModel: process.env.AI_MODEL || defaults.model,
+    visionModel: process.env.AI_VISION_MODEL || "qwen-vl-plus"
+  };
+}
+
 export type { AIProviderName, AIProviderConfig, AIChatMessage, AIProviderResponse, AIProvider };

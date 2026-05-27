@@ -1,5 +1,5 @@
 ﻿import { generateMockAnalysisReport } from "@/lib/mockAnalysis";
-import type { AnalyzeProductResponse } from "@/types/ai";
+import type { AnalyzeModelInfo, AnalyzeProductResponse } from "@/types/ai";
 import type { ProductInput, RecognizedProductFields } from "@/types/product";
 import type { AnalysisReport } from "@/types/recommendation";
 
@@ -10,6 +10,7 @@ export type ClientAnalysisResult = {
   source: ClientAnalysisSource;
   message?: string;
   recognizedFields?: RecognizedProductFields;
+  modelInfo?: AnalyzeModelInfo;
 };
 
 function fallbackToMock(product: ProductInput, message: string): ClientAnalysisResult {
@@ -71,7 +72,8 @@ export async function analyzeProductFromClient(
         report: result.data,
         source: result.source,
         message: result.message ?? "已通过后端分析接口生成报告。",
-        recognizedFields: result.recognizedFields
+        recognizedFields: result.recognizedFields,
+        modelInfo: result.modelInfo
       };
     }
 

@@ -10,6 +10,7 @@ import { RecognizedFieldsPanel } from "@/components/RecognizedFieldsPanel";
 import { UsageGuideCard } from "@/components/UsageGuideCard";
 import { analyzeProductFromClient } from "@/lib/clientAnalyze";
 import type { ClientAnalysisSource } from "@/lib/clientAnalyze";
+import type { AnalyzeModelInfo } from "@/types/ai";
 import type { ProductInput, RecognizedProductFields } from "@/types/product";
 import type { AnalysisReport } from "@/types/recommendation";
 
@@ -30,6 +31,7 @@ export default function Home() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisSource, setAnalysisSource] = useState<ClientAnalysisSource | undefined>();
   const [analysisMessage, setAnalysisMessage] = useState<string | undefined>();
+  const [modelInfo, setModelInfo] = useState<AnalyzeModelInfo | undefined>();
   const [recognizedFields, setRecognizedFields] = useState<RecognizedProductFields | undefined>();
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [authorizedPhone, setAuthorizedPhone] = useState<string | null>(null);
@@ -56,6 +58,7 @@ export default function Home() {
       setReport(result.report);
       setAnalysisSource(result.source);
       setAnalysisMessage(result.message);
+      setModelInfo(result.modelInfo);
       setRecognizedFields(result.recognizedFields);
     } finally {
       setIsAnalyzing(false);
@@ -72,6 +75,7 @@ export default function Home() {
     setReport(null);
     setAnalysisSource(undefined);
     setAnalysisMessage(undefined);
+    setModelInfo(undefined);
     setRecognizedFields(undefined);
     setIsAnalyzing(false);
   }
@@ -258,6 +262,7 @@ export default function Home() {
                   onReanalyze={handleReanalyze}
                   analysisSource={analysisSource}
                   analysisMessage={analysisMessage}
+                  modelInfo={modelInfo}
                   isAnalyzing={isAnalyzing}
                 />
               ) : (

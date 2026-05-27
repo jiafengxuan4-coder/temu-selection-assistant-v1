@@ -27,12 +27,19 @@ export type AnalyzeProductRequest = {
   product: ProductInput;
 };
 
+export type AnalyzeModelInfo = {
+  provider: string;
+  textModel: string;
+  visionModel: string;
+};
+
 export type AnalyzeProductSuccessResponse = {
   ok: true;
   data: AnalysisReport;
   source: "api" | "mock_fallback";
   message?: string;
   recognizedFields?: RecognizedProductFields;
+  modelInfo?: AnalyzeModelInfo;
 };
 
 export type AnalyzeProductErrorResponse = {

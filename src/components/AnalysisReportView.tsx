@@ -9,6 +9,7 @@ import {
   type PackagePlanSelection
 } from "@/lib/reportFormatter";
 import type { ClientAnalysisSource } from "@/lib/clientAnalyze";
+import type { AnalyzeModelInfo } from "@/types/ai";
 import type { AnalysisReport } from "@/types/recommendation";
 
 type AnalysisReportViewProps = {
@@ -16,6 +17,7 @@ type AnalysisReportViewProps = {
   onReanalyze?: () => void;
   analysisSource?: ClientAnalysisSource;
   analysisMessage?: string;
+  modelInfo?: AnalyzeModelInfo;
   isAnalyzing?: boolean;
 };
 
@@ -119,6 +121,7 @@ export function AnalysisReportView({
   onReanalyze,
   analysisSource,
   analysisMessage,
+  modelInfo,
   isAnalyzing = false
 }: AnalysisReportViewProps) {
   const pre = report.preGenerationReport;
@@ -145,6 +148,13 @@ export function AnalysisReportView({
                   <p className="mt-1 text-slate-500">
                     {analysisSource === "mock_fallback" ? `原因：${analysisMessage}` : analysisMessage}
                   </p>
+                ) : null}
+                {modelInfo ? (
+                  <div className="mt-2 grid gap-1 text-xs text-slate-500 sm:grid-cols-3">
+                    <p>当前 provider：{modelInfo.provider}</p>
+                    <p>文本分析模型：{modelInfo.textModel}</p>
+                    <p>截图识别模型：{modelInfo.visionModel}</p>
+                  </div>
                 ) : null}
               </div>
             ) : null}
