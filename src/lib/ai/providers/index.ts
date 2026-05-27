@@ -17,7 +17,7 @@ const DEFAULT_CONFIG: Record<AIProviderName, { baseUrl: string; model: string }>
   },
   qwen: {
     baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-    model: "qwen-plus"
+    model: "qwen3.6-plus"
   },
   doubao: {
     baseUrl: "https://ark.cn-beijing.volces.com/api/v3",

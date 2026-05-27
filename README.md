@@ -62,7 +62,7 @@ http://localhost:3000
 AI_PROVIDER=qwen
 AI_API_KEY=your_api_key_here
 AI_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
-AI_MODEL=qwen-plus
+AI_MODEL=qwen3.6-plus
 ALLOWED_PHONE_NUMBERS=13800138000,13900139000
 ADMIN_WECHAT=your_wechat_id
 NEXT_PUBLIC_ADMIN_WECHAT=your_wechat_id
